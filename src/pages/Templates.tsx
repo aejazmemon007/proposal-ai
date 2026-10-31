@@ -181,11 +181,11 @@ export default function Templates() {
             <div className="border border-border rounded-2xl overflow-hidden shadow-inner mb-6">
               <div className={`p-6 bg-gradient-to-r ${selectedTemplateForPreview.previewGradient} text-white`}>
                 <div className="flex items-center justify-between text-xs mb-4 opacity-80">
-                  <span>Rivera Design Studio</span>
+                  <span>{user?.businessName || "Your Design Studio"}</span>
                   <span>CONFIDENTIAL PROPOSAL</span>
                 </div>
                 <h4 className="text-xl font-bold mb-1">SaaS Dashboard Redesign</h4>
-                <p className="text-xs opacity-80">Prepared for Acme Technologies</p>
+                <p className="text-xs opacity-80">Prepared for Client Company</p>
                 <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/20 text-[11px]">
                   <div><span className="opacity-70 block">Date</span>Sep 10, 2026</div>
                   <div><span className="opacity-70 block">Investment</span>₹45,000</div>

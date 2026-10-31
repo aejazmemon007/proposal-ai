@@ -23,6 +23,11 @@ export interface User {
   gradientAngle?: number;
   hideWatermark?: boolean;
   tagline?: string;
+  upiId?: string;
+  upiName?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
   subscription: SubscriptionPlan;
   usageThisMonth: number;
   onboardingComplete: boolean;

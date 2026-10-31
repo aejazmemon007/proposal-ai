@@ -1,40 +1,20 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import { Check, X, Sparkles, Download, AlertCircle, ChevronDown } from "lucide-react";
+import { Check, X, Sparkles, Download, AlertCircle, ChevronDown, ShieldCheck, Lock, ExternalLink, Calendar, CheckCircle2, Loader2, Smartphone, QrCode } from "lucide-react";
 import { useApp, decodeProposalPayload } from "../lib/store";
+import { FREE_PAYMENT_CONFIG, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
 import { CURRENCY_SYMBOLS } from "../types";
 import type { ProposalContent, TemplateDesignId } from "../types";
 import ProposalThemeView from "../components/ProposalThemeView";
+import { downloadElementAsPDF } from "../lib/pdfExport";
 
-const SECTIONS = [
-  { key: "introduction", label: "Introduction" },
-  { key: "project_understanding", label: "Project Understanding" },
-  { key: "goals", label: "Goals" },
-  { key: "proposed_solution", label: "Proposed Solution" },
-  { key: "scope", label: "Scope of Work" },
-  { key: "deliverables", label: "Deliverables" },
-  { key: "timeline", label: "Timeline" },
-  { key: "investment", label: "Investment" },
-  { key: "payment_terms", label: "Payment Terms" },
-  { key: "revisions", label: "Revisions" },
-  { key: "exclusions", label: "Exclusions" },
-  { key: "assumptions", label: "Assumptions" },
-  { key: "terms", label: "Terms" },
-  { key: "next_steps", label: "Next Steps" },
+const REJECTION_REASONS = [
+  "Budget constraints or pricing adjustment needed",
+  "Timeline or sprint delivery schedule mismatch",
+  "Scope revision required for specific deliverables",
+  "Postponing project kick-off to later date",
+  "Other considerations"
 ];
-
-function getSectionText(content: ProposalContent, key: string): string {
-  const val = (content as unknown as Record<string, unknown>)[key];
-  if (typeof val === "string") return val;
-  if (Array.isArray(val)) return val.map((v) => typeof v === "string" ? v : typeof v === "object" && v ? `${(v as {phase?: string}).phase || ""}: ${(v as {duration?: string}).duration || ""} — ${(v as {description?: string}).description || ""}` : "").join("\n");
-  if (key === "investment" && typeof val === "object" && val) {
-    const inv = val as {total?: number; currency?: string};
-    return `${CURRENCY_SYMBOLS[inv.currency || "INR"] || ""}${(inv.total || 0).toLocaleString()}`;
-  }
-  return "";
-}
-
-const REJECTION_REASONS = ["Budget", "Timeline", "Scope", "Not moving forward", "Other"];
 
 export default function PublicProposal() {
   const { token } = useParams<{ token: string }>();
@@ -42,10 +22,22 @@ export default function PublicProposal() {
   const { proposals, updateProposal, saveProposalDirectly } = useApp();
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [signerName, setSignerName] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectionNote, setRejectionNote] = useState("");
   const [actionDone, setActionDone] = useState<"accepted" | "rejected" | null>(null);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!proposal) return;
+    const element = document.getElementById("proposal-document-container");
+    await downloadElementAsPDF(
+      element,
+      proposal.projectName || "Proposal",
+      setDownloadingPDF
+    );
+  };
 
   useEffect(() => {
     try {
@@ -83,13 +75,13 @@ export default function PublicProposal() {
 
   if (!proposal) {
     return (
-      <div className="min-h-screen bg-[#fafaf8] flex items-center justify-center px-6">
-        <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-2xl bg-[#f4f4f2] flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-[#6b6b7a]" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+        <div className="text-center max-w-sm bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-slate-500" />
           </div>
-          <h1 className="text-xl font-semibold text-[#0f0f12] mb-2">Proposal not found</h1>
-          <p className="text-sm text-[#6b6b7a]">This proposal may have been revoked or the link is incorrect.</p>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Proposal not found</h1>
+          <p className="text-sm text-slate-500">This proposal link may have been revoked or is no longer valid.</p>
         </div>
       </div>
     );
@@ -97,10 +89,10 @@ export default function PublicProposal() {
 
   if (proposal.status === "expired") {
     return (
-      <div className="min-h-screen bg-[#fafaf8] flex items-center justify-center px-6">
-        <div className="text-center">
-          <h1 className="text-xl font-semibold text-[#0f0f12] mb-2">This proposal has expired</h1>
-          <p className="text-sm text-[#6b6b7a]">Please contact the sender for an updated proposal.</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+        <div className="text-center max-w-sm bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
+          <h1 className="text-xl font-bold text-slate-900 mb-2">This proposal has expired</h1>
+          <p className="text-sm text-slate-500">Please reach out to the sender for an updated schedule and fee estimate.</p>
         </div>
       </div>
     );
@@ -108,13 +100,21 @@ export default function PublicProposal() {
 
   const handleAccept = () => {
     if (!agreed) return;
-    updateProposal(proposal.id, { status: "accepted", acceptedAt: new Date().toISOString() });
+    updateProposal(proposal.id, {
+      status: "accepted",
+      acceptedAt: new Date().toISOString(),
+      clientName: signerName.trim() || proposal.clientName,
+    });
     setActionDone("accepted");
     setAcceptOpen(false);
   };
 
   const handleReject = () => {
-    updateProposal(proposal.id, { status: "rejected", rejectedAt: new Date().toISOString(), rejectionReason });
+    updateProposal(proposal.id, {
+      status: "rejected",
+      rejectedAt: new Date().toISOString(),
+      rejectionReason: `${rejectionReason}${rejectionNote ? ` - ${rejectionNote}` : ""}`,
+    });
     setActionDone("rejected");
     setRejectOpen(false);
   };
@@ -122,15 +122,77 @@ export default function PublicProposal() {
   const sym = CURRENCY_SYMBOLS[proposal.currency] || "₹";
 
   if (actionDone === "accepted") {
+    const depositAmount = Math.round(proposal.price * 0.5);
+    const clientUpiUrl = buildUpiIntentUrl({
+      upiId: FREE_PAYMENT_CONFIG.upiId,
+      merchantName: FREE_PAYMENT_CONFIG.merchantName,
+      amount: depositAmount,
+      transactionNote: `Deposit - ${proposal.projectName.slice(0, 20)}`,
+    });
+    const clientQrCode = buildUpiQrCodeUrl(clientUpiUrl, 220);
+
     return (
-      <div className="min-h-screen bg-[#fafaf8] flex items-center justify-center px-6">
-        <div className="text-center max-w-sm">
-          <div className="w-16 h-16 rounded-full bg-[#059669]/10 flex items-center justify-center mx-auto mb-6">
-            <Check className="w-8 h-8 text-[#059669]" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
+        <div className="text-center max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-2xl space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600 shadow-md">
+            <Check className="w-8 h-8 stroke-[3]" />
           </div>
-          <h1 className="text-2xl font-semibold text-[#0f0f12] mb-2">Proposal accepted!</h1>
-          <p className="text-[#6b6b7a] mb-2">You've accepted the proposal for <strong>{proposal.projectName}</strong>.</p>
-          <p className="text-sm text-[#6b6b7a]">The sender has been notified and will be in touch shortly.</p>
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+            Agreement Executed
+          </span>
+          <h1 className="text-2xl font-bold text-slate-950">Proposal Formally Accepted!</h1>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Thank you, <strong>{signerName || proposal.clientName}</strong>. You've accepted the project agreement for <strong>{proposal.projectName}</strong>.
+          </p>
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-left space-y-1.5">
+            <div className="flex justify-between"><span className="text-slate-500">Total Investment:</span><strong className="text-slate-900">{sym}{proposal.price.toLocaleString()}</strong></div>
+            <div className="flex justify-between"><span className="text-slate-500">Initial Deposit (50%):</span><strong className="text-emerald-700">{sym}{depositAmount.toLocaleString()}</strong></div>
+            <div className="flex justify-between"><span className="text-slate-500">Confirmation Hash:</span><span className="font-mono text-slate-400">#SIG-{(Date.now()).toString(36).toUpperCase()}</span></div>
+          </div>
+
+          {/* 100% Free UPI Deposit Payment Box */}
+          <div className="p-4 bg-gradient-to-b from-emerald-50/70 to-slate-50/50 border border-emerald-200/90 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between text-left">
+              <div>
+                <p className="text-xs font-bold text-slate-900">Pay 50% Project Deposit</p>
+                <p className="text-[11px] text-slate-500">Direct UPI transfer · 0% extra fee</p>
+              </div>
+              <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
+                {sym}{depositAmount.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm inline-block mx-auto">
+              <img
+                src={clientQrCode}
+                alt="Scan to Pay Deposit via UPI"
+                className="w-36 h-36 object-contain mx-auto rounded"
+              />
+            </div>
+
+            <a
+              href={clientUpiUrl}
+              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Tap to Pay Deposit via UPI App</span>
+            </a>
+
+            <p className="text-[10px] text-slate-400 font-mono">
+              UPI ID: {FREE_PAYMENT_CONFIG.upiId}
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloadingPDF}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-violet-600" />
+              <span>{downloadingPDF ? "Generating PDF..." : "Download Signed Proposal PDF"}</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -138,107 +200,189 @@ export default function PublicProposal() {
 
   if (actionDone === "rejected") {
     return (
-      <div className="min-h-screen bg-[#fafaf8] flex items-center justify-center px-6">
-        <div className="text-center max-w-sm">
-          <h1 className="text-xl font-semibold text-[#0f0f12] mb-2">Response sent</h1>
-          <p className="text-[#6b6b7a]">The sender has been notified. Thank you for your time.</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+        <div className="text-center max-w-sm bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-3">
+          <h1 className="text-xl font-bold text-slate-900">Feedback Submitted</h1>
+          <p className="text-sm text-slate-500">The lead partner has been notified of your comments. Thank you for your review.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f0f0ee]">
-      {/* Header bar */}
-      <div className="bg-white border-b border-[#e5e5eb] px-6 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#7c3aed] flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
+    <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-24">
+      {/* Client Portal Header Bar */}
+      <header className="bg-white/95 backdrop-blur-xl border-b border-slate-200/90 px-6 py-3.5 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-600/20">
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 block leading-tight">{proposal.projectName}</span>
+              <span className="text-[11px] text-slate-500 font-medium">Bespoke Client Review Portal</span>
+            </div>
           </div>
-          <span className="text-sm font-semibold text-[#0f0f12]">ProposalAI</span>
-          <span className="text-[#e5e5eb]">·</span>
-          <span className="text-sm text-[#6b6b7a]">{proposal.projectName}</span>
-        </div>
-        <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 text-sm text-[#6b6b7a] hover:text-[#0f0f12] border border-[#e5e5eb] px-3 py-1.5 rounded-lg">
-          <Download className="w-4 h-4" /> Download PDF
-        </button>
-      </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {/* Render Proposal with Custom Template Theme */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloadingPDF}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-950 bg-white hover:bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-xl transition-all shadow-2xs disabled:opacity-60 cursor-pointer"
+            >
+              {downloadingPDF ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 text-violet-600 animate-spin" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5 text-violet-600" />
+                  <span>Download PDF</span>
+                </>
+              )}
+            </button>
+
+            {!["accepted", "rejected"].includes(proposal.status) && (
+              <button
+                onClick={() => setAcceptOpen(true)}
+                className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold px-4.5 py-2 rounded-xl shadow-md shadow-emerald-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" /> Accept Proposal
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Document Content */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
+        {/* Render Proposal with the Theme */}
         <ProposalThemeView
           proposal={proposal}
           templateId={(proposal.templateId as TemplateDesignId) || "modern-minimal"}
         />
 
-        {/* Accept / Reject Decision Box */}
+        {/* Action Decision Dock */}
         {!["accepted", "rejected"].includes(proposal.status) && (
-          <div className="bg-card border border-border rounded-3xl p-8 text-center shadow-lg">
-            <h2 className="text-xl font-bold text-foreground mb-2">Ready to move forward?</h2>
-            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-              Please review the scope and pricing above. Click below to accept or submit feedback.
+          <div className="bg-white border border-slate-200/90 rounded-[28px] p-8 text-center shadow-xl space-y-4">
+            <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3.5 py-1 rounded-full text-xs font-bold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Ready for Formal Sign-off</span>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-950">Ready to kick off this engagement?</h2>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+              Accepting this proposal locks in the timeline, deliverable milestones, and secures capacity for your target start date.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3.5 justify-center max-w-md mx-auto">
+
+            <div className="flex flex-col sm:flex-row gap-3.5 justify-center max-w-md mx-auto pt-2">
               <button
                 onClick={() => setAcceptOpen(true)}
-                className="flex-1 flex items-center justify-center gap-2 bg-success text-white py-3.5 px-6 rounded-2xl font-bold text-sm hover:bg-success/90 shadow-lg shadow-success/20 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3.5 px-6 rounded-2xl font-bold text-sm hover:from-emerald-700 hover:to-teal-700 shadow-xl shadow-emerald-600/20 hover:scale-[1.02] transition-all cursor-pointer"
               >
-                <Check className="w-4 h-4 stroke-[3]" /> Accept Proposal
+                <Check className="w-4 h-4 stroke-[3]" /> Accept & Sign Online
               </button>
               <button
                 onClick={() => setRejectOpen(true)}
-                className="flex-1 flex items-center justify-center gap-2 border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted py-3.5 px-6 rounded-2xl font-semibold text-sm transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 border border-slate-200 bg-white text-slate-600 hover:text-slate-950 hover:bg-slate-50 py-3.5 px-6 rounded-2xl font-semibold text-sm transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" /> Request Changes / Reject
+                <X className="w-4 h-4" /> Request Adjustments
+              </button>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handleDownloadPDF}
+                disabled={downloadingPDF}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-violet-700 transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{downloadingPDF ? "Generating PDF..." : "Download Official Proposal PDF"}</span>
               </button>
             </div>
           </div>
         )}
 
         {proposal.status === "accepted" && (
-          <div className="bg-success/10 border-2 border-success/30 rounded-3xl p-6 text-center shadow-sm">
-            <div className="flex items-center justify-center gap-2 text-success font-bold text-base mb-1">
-              <Check className="w-5 h-5 stroke-[3]" /> Proposal Formally Accepted
+          <div className="bg-emerald-50 border-2 border-emerald-300 rounded-[28px] p-6 text-center shadow-sm">
+            <div className="flex items-center justify-center gap-2 text-emerald-800 font-bold text-base mb-1">
+              <Check className="w-5 h-5 stroke-[3]" /> Proposal Formally Executed
             </div>
-            <p className="text-xs text-muted-foreground">The project agreement has been confirmed.</p>
+            <p className="text-xs text-slate-600">The agreement has been officially accepted online.</p>
           </div>
         )}
 
         {proposal.status === "rejected" && (
-          <div className="bg-muted border border-border rounded-3xl p-6 text-center">
-            <p className="text-sm text-muted-foreground">This proposal was not accepted ({proposal.rejectionReason || "Declined"}).</p>
+          <div className="bg-slate-50 border border-slate-200 rounded-[28px] p-6 text-center">
+            <p className="text-sm text-slate-600">This proposal was declined ({proposal.rejectionReason || "Feedback provided"}).</p>
           </div>
         )}
 
         {/* Footer */}
         {!proposal.hideWatermark && (
-          <div className="py-4 text-center text-xs text-muted-foreground">
-            <span>Created & sent via <strong>ProposalAI</strong> · © 2026</span>
+          <div className="py-4 text-center text-xs text-slate-400">
+            <span>Powered by <strong>ProposalAI</strong> · High-Ticket Proposal Platform · © 2026</span>
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Accept modal */}
+      {/* Accept Modal with E-Signature */}
       {acceptOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-up">
-            <h3 className="text-lg font-semibold text-[#0f0f12] mb-1">Accept Proposal</h3>
-            <p className="text-sm text-[#6b6b7a] mb-5">You're about to accept the proposal for <strong>{proposal.projectName}</strong>.</p>
-            <div className="bg-[#f4f4f2] rounded-xl p-4 mb-5 space-y-2">
-              <div className="flex justify-between text-sm"><span className="text-[#6b6b7a]">Project</span><span className="font-medium text-[#0f0f12]">{proposal.projectName}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-[#6b6b7a]">Investment</span><span className="font-semibold text-[#0f0f12]">{sym}{proposal.price.toLocaleString()}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-[#6b6b7a]">Payment</span><span className="text-[#0f0f12]">{proposal.paymentSchedule || "As agreed"}</span></div>
-            </div>
-            <label className="flex items-start gap-3 mb-6 cursor-pointer">
-              <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5" />
-              <span className="text-sm text-[#0f0f12]">I agree to the proposal terms and conditions.</span>
-            </label>
-            <div className="flex gap-3">
-              <button onClick={handleAccept} disabled={!agreed}
-                className="flex-1 bg-[#059669] text-white py-2.5 rounded-xl font-semibold hover:bg-[#047857] transition-colors disabled:opacity-50">
-                Accept Proposal
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-lg shadow-2xl border border-slate-200 animate-slide-up space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">Execute Project Agreement</h3>
+                <p className="text-xs text-slate-500">Sign to confirm the scope, deliverables, and fees.</p>
+              </div>
+              <button onClick={() => setAcceptOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
               </button>
-              <button onClick={() => setAcceptOpen(false)} className="flex-1 border border-[#e5e5eb] text-[#0f0f12] py-2.5 rounded-xl font-semibold hover:bg-[#f4f4f2] transition-colors">
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-xs border border-slate-200/80">
+              <div className="flex justify-between"><span className="text-slate-500">Project:</span><span className="font-bold text-slate-900">{proposal.projectName}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Total Fixed Fee:</span><span className="font-extrabold text-slate-950">{sym}{proposal.price.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Kick-off Deposit (50%):</span><span className="font-bold text-emerald-700">{sym}{(proposal.price * 0.5).toLocaleString()}</span></div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                Type Your Full Legal Name to E-Sign:
+              </label>
+              <input
+                type="text"
+                placeholder={proposal.clientName || "e.g. Sarah Jenkins"}
+                value={signerName}
+                onChange={(e) => setSignerName(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 transition-all font-display italic"
+              />
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer pt-1">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed">
+                I am authorized to accept this proposal on behalf of <strong>{proposal.company || proposal.clientName}</strong> and agree to the payment schedule and terms outlined.
+              </span>
+            </label>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleAccept}
+                disabled={!agreed}
+                className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold text-xs hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-600/20 transition-all disabled:opacity-40"
+              >
+                Confirm & Sign Proposal
+              </button>
+              <button
+                onClick={() => setAcceptOpen(false)}
+                className="px-5 py-3 border border-slate-200 text-slate-700 rounded-xl font-semibold text-xs hover:bg-slate-50 transition-colors"
+              >
                 Cancel
               </button>
             </div>
@@ -246,26 +390,55 @@ export default function PublicProposal() {
         </div>
       )}
 
-      {/* Reject modal */}
+      {/* Reject Modal */}
       {rejectOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-slide-up">
-            <h3 className="text-lg font-semibold text-[#0f0f12] mb-1">Not moving forward?</h3>
-            <p className="text-sm text-[#6b6b7a] mb-5">Would you like to share why? This helps the sender improve.</p>
-            <div className="space-y-2 mb-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-lg shadow-2xl border border-slate-200 animate-slide-up space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">Request Changes / Adjustments</h3>
+                <p className="text-xs text-slate-500">Let the lead partner know what needs adjusting.</p>
+              </div>
+              <button onClick={() => setRejectOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
               {REJECTION_REASONS.map((r) => (
-                <button key={r} onClick={() => setRejectionReason(r)}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium text-left transition-colors ${rejectionReason === r ? "border-[#7c3aed] bg-[#7c3aed]/8 text-[#7c3aed]" : "border-[#e5e5eb] text-[#0f0f12] hover:border-[#7c3aed]/40"}`}>
+                <button
+                  key={r}
+                  onClick={() => setRejectionReason(r)}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-xs font-semibold text-left transition-all ${
+                    rejectionReason === r
+                      ? "border-violet-600 bg-violet-50 text-violet-700 shadow-2xs"
+                      : "border-slate-200 text-slate-700 hover:border-slate-300"
+                  }`}
+                >
                   {r}
                 </button>
               ))}
             </div>
-            <textarea value={rejectionNote} onChange={(e) => setRejectionNote(e.target.value)} rows={3} placeholder="Optional note..." className="w-full bg-[#f4f4f2] border border-[#e5e5eb] rounded-xl px-3.5 py-2.5 text-sm text-[#0f0f12] resize-none focus:outline-none mb-4" />
-            <div className="flex gap-3">
-              <button onClick={handleReject} className="flex-1 bg-[#0f0f12] text-white py-2.5 rounded-xl font-semibold hover:opacity-90 transition-opacity">
-                Send Response
+
+            <textarea
+              value={rejectionNote}
+              onChange={(e) => setRejectionNote(e.target.value)}
+              rows={3}
+              placeholder="Provide specific details or feedback..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 transition-all resize-none"
+            />
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleReject}
+                className="flex-1 bg-slate-950 text-white py-3 rounded-xl font-bold text-xs hover:bg-slate-800 transition-colors"
+              >
+                Send Feedback to Partner
               </button>
-              <button onClick={() => setRejectOpen(false)} className="flex-1 border border-[#e5e5eb] text-[#0f0f12] py-2.5 rounded-xl font-semibold hover:bg-[#f4f4f2] transition-colors">
+              <button
+                onClick={() => setRejectOpen(false)}
+                className="px-5 py-3 border border-slate-200 text-slate-700 rounded-xl font-semibold text-xs hover:bg-slate-50 transition-colors"
+              >
                 Cancel
               </button>
             </div>

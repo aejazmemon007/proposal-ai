@@ -193,7 +193,7 @@ export default function Onboarding() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Business / studio name</label>
-                  <input value={data.businessName} onChange={(e) => update("businessName", e.target.value)} placeholder="Rivera Design Studio" className={inputClass} />
+                  <input value={data.businessName} onChange={(e) => update("businessName", e.target.value)} placeholder="e.g. Acme Studio" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Website</label>

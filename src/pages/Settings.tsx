@@ -2,9 +2,10 @@ import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   User, Building, Palette, FileText, Sparkles, CreditCard, Shield, Check, Zap,
-  Upload, Image, Trash2, Lock, Sliders, RefreshCw, Eye
+  Upload, Image, Trash2, Lock, Sliders, RefreshCw, Eye, Smartphone, QrCode, Copy, CheckCircle2
 } from "lucide-react";
 import { useApp } from "../lib/store";
+import { FREE_PAYMENT_CONFIG, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
 import { CURRENCIES, PROFESSIONS, PLAN_PRICES, BRAND_GRADIENT_PRESETS } from "../types";
 
 const TABS = [
@@ -77,6 +78,13 @@ export default function Settings() {
   const [defaultRevisions, setDefaultRevisions] = useState("2 rounds included");
   const [defaultStyle, setDefaultStyle] = useState("professional");
 
+  // Free Direct Payment details (UPI & Bank)
+  const [upiId, setUpiId] = useState(user?.upiId || FREE_PAYMENT_CONFIG.upiId);
+  const [upiName, setUpiName] = useState(user?.upiName || user?.businessName || FREE_PAYMENT_CONFIG.merchantName);
+  const [bankName, setBankName] = useState(user?.bankName || FREE_PAYMENT_CONFIG.bankName);
+  const [accountNumber, setAccountNumber] = useState(user?.accountNumber || FREE_PAYMENT_CONFIG.accountNumber);
+  const [ifscCode, setIfscCode] = useState(user?.ifscCode || FREE_PAYMENT_CONFIG.ifscCode);
+
   const handleSave = (updates: object) => {
     updateUser(updates);
     setSaved(true);
@@ -120,9 +128,8 @@ export default function Settings() {
         <nav className="lg:w-52 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible shrink-0">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === id ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}>
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${activeTab === id ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}>
               <Icon className="w-4 h-4 shrink-0" />
               {label}
             </button>
@@ -173,7 +180,7 @@ export default function Settings() {
               </div>
               <p className="text-sm text-muted-foreground mb-5">This information appears on your proposals, client links, and tax receipts.</p>
               <div className="space-y-4">
-                <div><label className={labelClass}>Business / studio name</label><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Rivera Design Studio" className={inputClass} /></div>
+                <div><label className={labelClass}>Business / studio name</label><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Acme Design Studio" className={inputClass} /></div>
                 <div><label className={labelClass}>Tagline</label><input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Premium UI/UX design for modern products" className={inputClass} /></div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div><label className={labelClass}>Website</label><input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yoursite.com" className={inputClass} /></div>
@@ -377,9 +384,8 @@ export default function Settings() {
                                 setGradientTo(g.to);
                                 if (g.angle) setGradientAngle(g.angle);
                               }}
-                              className={`p-3 rounded-2xl text-left text-white border-2 transition-all shadow-sm ${
-                                isActive ? "border-foreground ring-2 ring-primary/40 scale-[1.02]" : "border-transparent hover:opacity-90"
-                              }`}
+                              className={`p-3 rounded-2xl text-left text-white border-2 transition-all shadow-sm ${isActive ? "border-foreground ring-2 ring-primary/40 scale-[1.02]" : "border-transparent hover:opacity-90"
+                                }`}
                               style={{ background: g.css }}
                             >
                               <p className="text-xs font-bold drop-shadow-sm">{g.name}</p>
@@ -504,11 +510,11 @@ export default function Settings() {
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-lg bg-white text-slate-900 flex items-center justify-center font-bold text-sm shadow">
-                            {businessName ? businessName.charAt(0) : "R"}
+                            {businessName ? businessName.charAt(0).toUpperCase() : (user?.businessName ? user.businessName.charAt(0).toUpperCase() : "P")}
                           </div>
                         )}
                         <span className="font-bold text-sm text-white drop-shadow-sm">
-                          {businessName || "Rivera Design Studio"}
+                          {businessName || user?.businessName || "Your Studio Name"}
                         </span>
                       </div>
                       <span className="text-[11px] font-bold bg-white/20 backdrop-blur-md text-white px-3 py-1 rounded-full">
@@ -520,7 +526,7 @@ export default function Settings() {
                       SaaS Dashboard Redesign
                     </h3>
                     <p className="text-xs text-white/90 mb-6 drop-shadow-sm">
-                      {tagline || "Prepared for Acme Technologies · Executive Project Proposal"}
+                      {tagline || user?.tagline || "Prepared for Client · Executive Project Proposal"}
                     </p>
 
                     <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/20 text-xs text-white/90">
@@ -671,6 +677,99 @@ export default function Settings() {
                     )}
                   </div>
                 ))}
+              </div>
+
+              {/* Free Direct Payment Integration Settings */}
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-5 h-5 text-emerald-600" />
+                      <h2 className="text-base font-semibold text-foreground">Free Payment Integration (Direct UPI & Bank)</h2>
+                      <span className="text-[10px] bg-emerald-500/15 text-emerald-600 font-bold px-2 py-0.5 rounded-full">0% GATEWAY FEES</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Receive 100% direct payouts without paying 2-3% platform cuts or recurring gateway subscriptions.</p>
+                  </div>
+                  <SaveButton onClick={() => handleSave({ upiId, upiName, bankName, accountNumber, ifscCode })} saved={saved} />
+                </div>
+
+                <div className="grid md:grid-cols-12 gap-6">
+                  <div className="md:col-span-7 space-y-4">
+                    <div>
+                      <label className={labelClass}>Your UPI ID (VPA)</label>
+                      <input
+                        value={upiId}
+                        onChange={(e) => setUpiId(e.target.value)}
+                        placeholder="e.g. yourname@okaxis or business@upi"
+                        className={inputClass}
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">Found in Google Pay, PhonePe, Paytm, or your bank app.</p>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Merchant / Account Display Name</label>
+                      <input
+                        value={upiName}
+                        onChange={(e) => setUpiName(e.target.value)}
+                        placeholder="e.g. Acme Design Studio"
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelClass}>Bank Name</label>
+                        <input
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          placeholder="e.g. HDFC Bank"
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>IFSC Code</label>
+                        <input
+                          value={ifscCode}
+                          onChange={(e) => setIfscCode(e.target.value)}
+                          placeholder="e.g. HDFC0000123"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Bank Account Number</label>
+                      <input
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value)}
+                        placeholder="e.g. 50200098765432"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live Dynamic Scannable QR Preview */}
+                  <div className="md:col-span-5 bg-muted/30 border border-border rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Live Scannable QR Preview</span>
+                    <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-md mb-3">
+                      <img
+                        src={buildUpiQrCodeUrl(buildUpiIntentUrl({
+                          upiId: upiId || FREE_PAYMENT_CONFIG.upiId,
+                          merchantName: upiName || FREE_PAYMENT_CONFIG.merchantName,
+                          amount: 500,
+                          transactionNote: "Proposal Deposit"
+                        }), 180)}
+                        alt="Preview QR"
+                        className="w-36 h-36 object-contain rounded-lg"
+                      />
+                    </div>
+                    <p className="text-xs font-semibold text-foreground">{upiName || "Your Studio"}</p>
+                    <p className="text-[11px] font-mono text-muted-foreground">{upiId || "yourname@upi"}</p>
+                    <span className="inline-block mt-2 text-[10px] bg-emerald-500/15 text-emerald-600 font-semibold px-2 py-0.5 rounded-full">
+                      Scannable with any UPI App
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

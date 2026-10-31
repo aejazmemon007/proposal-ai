@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import {
   CheckCircle2, Sparkles, Download, ArrowRight, LayoutDashboard,
-  ShieldCheck, FileText, Calendar, CreditCard, User, Mail, Building, Printer, X
+  ShieldCheck, FileText, Calendar, CreditCard, User, Mail, Building, Printer, X, Loader2
 } from "lucide-react";
 import { useApp } from "../lib/store";
+import { downloadElementAsPDF } from "../lib/pdfExport";
 
 interface OrderState {
   orderId?: string;
@@ -39,9 +40,9 @@ export default function ThankYou() {
   const amountPaid = state.amountPaid || (subtotal + tax);
   const discount = state.discount || 0;
   const paymentMethod = state.paymentMethod || "Credit Card (•••• 4242)";
-  const customerName = state.customerName || (user ? `${user.firstName} ${user.lastName}` : "Alex Rivera");
-  const customerEmail = state.customerEmail || user?.email || "alex@designstudio.in";
-  const businessName = state.businessName || user?.businessName || "Rivera Design Studio";
+  const customerName = state.customerName || (user ? `${user.firstName} ${user.lastName}`.trim() : "Valued Member");
+  const customerEmail = state.customerEmail || user?.email || "customer@example.com";
+  const businessName = state.businessName || user?.businessName || "My Design Studio";
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
@@ -61,8 +62,15 @@ export default function ThankYou() {
     year: "numeric",
   });
 
-  const handlePrintInvoice = () => {
-    window.print();
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+
+  const handlePrintInvoice = async () => {
+    const element = document.getElementById("invoice-receipt-container");
+    if (element) {
+      await downloadElementAsPDF(element, `Invoice_${orderId}`, setDownloadingPDF);
+    } else {
+      window.print();
+    }
   };
 
   return (
@@ -120,9 +128,20 @@ export default function ThankYou() {
               </button>
               <button
                 onClick={handlePrintInvoice}
-                className="flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-3.5 py-2 rounded-xl transition-colors"
+                disabled={downloadingPDF}
+                className="flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-3.5 py-2 rounded-xl transition-colors disabled:opacity-60 cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" /> Download PDF
+                {downloadingPDF ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -231,7 +250,7 @@ export default function ThankYou() {
             </button>
 
             {/* Printable Tax Invoice Content */}
-            <div className="space-y-6">
+            <div id="invoice-receipt-container" className="space-y-6">
               <div className="flex items-start justify-between border-b border-border pb-6">
                 <div>
                   <div className="flex items-center gap-2 mb-1">

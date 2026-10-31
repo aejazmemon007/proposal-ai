@@ -34,19 +34,19 @@ function ClientModal({ client, onClose }: { client?: Client; onClose: () => void
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-sm font-medium text-foreground mb-1.5">Name <span className="text-danger">*</span></label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Rahul Sharma" className={inputClass} />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Rahul Sharma" className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Company</label>
-              <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Acme Technologies" className={inputClass} />
+              <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Acme Corp" className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="rahul@acme.in" className={inputClass} />
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="client@company.com" className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Website</label>
-              <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://acme.in" className={inputClass} />
+              <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://company.com" className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>

@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Edit, Eye, Share2, Download, Copy, Archive, Trash, ArrowLeft, Sparkles, Check,
-  ChevronRight, Send, X, ExternalLink, Globe, Clock, Palette, Lock,
+  ChevronRight, Send, X, ExternalLink, Globe, Clock, Palette, Lock, Loader2
 } from "lucide-react";
 import { useApp, generatePublicToken, encodeProposalPayload } from "../lib/store";
 import { rewriteSection } from "../lib/mockAI";
 import { CURRENCY_SYMBOLS, PRO_TEMPLATE_DESIGNS } from "../types";
 import type { ProposalContent, TemplateDesignId } from "../types";
 import ProposalThemeView from "../components/ProposalThemeView";
+import { downloadElementAsPDF } from "../lib/pdfExport";
 
 const SECTIONS = [
   { key: "introduction", label: "Introduction" },
@@ -68,6 +69,7 @@ export default function ProposalDetail({ defaultTab }: ProposalDetailProps) {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   // AI panel
   const [aiInstruction, setAiInstruction] = useState("");
@@ -146,13 +148,18 @@ export default function ProposalDetail({ defaultTab }: ProposalDetailProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleExportPDF = () => {
-    const win = window.open(shareUrl, "_blank");
-    if (win) {
-      setTimeout(() => {
-        try { win.print(); } catch {}
-      }, 1000);
+  const handleExportPDF = async () => {
+    if (!proposal) return;
+    if (tab !== "preview") {
+      setTab("preview");
+      await new Promise((r) => setTimeout(r, 250));
     }
+    const element = document.getElementById("proposal-document-container");
+    await downloadElementAsPDF(
+      element,
+      proposal.projectName || "Proposal",
+      setDownloadingPDF
+    );
   };
 
   const statusStyles: Record<string, string> = {
@@ -192,8 +199,22 @@ export default function ProposalDetail({ defaultTab }: ProposalDetailProps) {
         <button onClick={handleShare} className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3.5 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors">
           <Share2 className="w-3.5 h-3.5" /> Share
         </button>
-        <button onClick={handleExportPDF} className="flex items-center gap-1.5 border border-border px-3.5 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors">
-          <Download className="w-3.5 h-3.5" /> PDF
+        <button
+          onClick={handleExportPDF}
+          disabled={downloadingPDF}
+          className="flex items-center gap-1.5 border border-border px-3.5 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          {downloadingPDF ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+              <span>Generating PDF...</span>
+            </>
+          ) : (
+            <>
+              <Download className="w-3.5 h-3.5" />
+              <span>Download PDF</span>
+            </>
+          )}
         </button>
       </div>
 

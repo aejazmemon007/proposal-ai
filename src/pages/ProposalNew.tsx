@@ -270,11 +270,11 @@ export default function ProposalNew() {
               <div className="grid sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Client name <span className="text-danger">*</span></label>
-                  <input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Rahul Sharma" className={inputClass} />
+                  <input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="e.g. Rahul Sharma" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Company</label>
-                  <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Acme Technologies" className={inputClass} />
+                  <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Acme Corp" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
