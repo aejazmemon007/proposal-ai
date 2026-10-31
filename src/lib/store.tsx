@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { supabase, isSupabaseConfigured } from "./supabase";
 import type {
   User, Proposal, Client, Notification, ProposalStatus, PricingModel, ProposalStyle
 } from "../types";
@@ -106,6 +107,131 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Please enter your password.");
     }
 
+    // 1. Cloud Database (Supabase) if configured
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to sign in. Please verify your credentials.");
+      }
+
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .single();
+
+        const loadedUser: User = profile ? {
+          id: profile.id,
+          email: profile.email,
+          firstName: profile.first_name || "",
+          lastName: profile.last_name || "",
+          profession: profile.profession,
+          experience: profile.experience,
+          currency: profile.currency || "INR",
+          businessName: profile.business_name,
+          website: profile.website,
+          phone: profile.phone,
+          location: profile.location,
+          logoUrl: profile.logo_url,
+          primaryColor: profile.primary_color || "#7c3aed",
+          colorMode: profile.color_mode || "gradient",
+          gradientFrom: profile.gradient_from || "#7c3aed",
+          gradientTo: profile.gradient_to || "#4f46e5",
+          gradientAngle: profile.gradient_angle || 135,
+          hideWatermark: profile.hide_watermark || false,
+          tagline: profile.tagline,
+          upiId: profile.upi_id || "proposal.ai@upi",
+          upiName: profile.upi_name,
+          bankName: profile.bank_name,
+          accountNumber: profile.account_number,
+          ifscCode: profile.ifsc_code,
+          subscription: (profile.subscription as any) || "free",
+          usageThisMonth: profile.usage_this_month || 0,
+          onboardingComplete: true,
+        } : {
+          id: data.user.id,
+          email: cleanEmail,
+          firstName: data.user.user_metadata?.firstName || "User",
+          lastName: data.user.user_metadata?.lastName || "",
+          currency: "INR",
+          subscription: "free",
+          usageThisMonth: 0,
+          onboardingComplete: true,
+        };
+
+        setUser(loadedUser);
+
+        // Fetch user's proposals from Supabase
+        const { data: cloudProposals } = await supabase
+          .from("proposals")
+          .select("*")
+          .eq("user_id", data.user.id)
+          .order("created_at", { ascending: false });
+
+        if (cloudProposals && cloudProposals.length > 0) {
+          const mapped: Proposal[] = cloudProposals.map((cp) => ({
+            id: cp.id,
+            userId: cp.user_id,
+            clientName: cp.client_name,
+            projectName: cp.project_name,
+            clientEmail: cp.client_email,
+            status: cp.status,
+            price: Number(cp.price) || 0,
+            currency: cp.currency || "INR",
+            pricingModel: cp.pricing_model || "fixed",
+            templateId: cp.template_id || "modern-minimal",
+            publicToken: cp.public_token,
+            content: cp.content,
+            briefAnalysis: cp.brief_analysis,
+            viewCount: cp.view_count || 0,
+            viewedAt: cp.viewed_at,
+            acceptedAt: cp.accepted_at,
+            rejectedAt: cp.rejected_at,
+            rejectionReason: cp.rejection_reason,
+            createdAt: cp.created_at,
+            updatedAt: cp.updated_at,
+            projectType: "Design",
+            brief: "",
+            scopeItems: [],
+            style: "professional",
+            tone: 40,
+            length: 60,
+            salesFocus: 50,
+          }));
+          setProposals(mapped);
+        }
+
+        // Fetch user's clients from Supabase
+        const { data: cloudClients } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("user_id", data.user.id);
+
+        if (cloudClients && cloudClients.length > 0) {
+          setClients(cloudClients.map((cc) => ({
+            id: cc.id,
+            name: cc.name,
+            email: cc.email,
+            company: cc.company,
+            phone: cc.phone,
+            status: cc.status,
+            totalRevenue: Number(cc.total_revenue) || 0,
+            currency: cc.currency || "INR",
+            proposalsCount: 0,
+            createdAt: cc.created_at,
+          })));
+        }
+
+        return;
+      }
+    }
+
+    // 2. Fallback to Local Storage accounts
     const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
     const account = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
 
@@ -138,6 +264,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Password must be at least 6 characters.");
     }
 
+    // 1. Cloud Database (Supabase) if configured
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: { firstName: cleanFirst, lastName: cleanLast },
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to create cloud account. Please try again.");
+      }
+
+      if (data.user) {
+        const newUser: User = {
+          id: data.user.id,
+          email: cleanEmail,
+          firstName: cleanFirst,
+          lastName: cleanLast,
+          currency: "INR",
+          subscription: "free",
+          usageThisMonth: 0,
+          onboardingComplete: false,
+        };
+
+        // Create initial profile in Supabase
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          email: cleanEmail,
+          first_name: cleanFirst,
+          last_name: cleanLast,
+          subscription: "free",
+          currency: "INR",
+        });
+
+        setUser(newUser);
+        return;
+      }
+    }
+
+    // 2. Fallback to Local Storage accounts
     const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
     const existing = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
     if (existing) {
@@ -160,6 +328,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.signOut().catch(() => {});
+    }
     setUser(null);
     try {
       localStorage.removeItem(STORAGE_KEYS.user);
@@ -170,11 +341,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => {
       if (!prev) return null;
       const updated = { ...prev, ...updates };
+
+      // Local accounts update
       const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
       const updatedAccounts = accounts.map((acc) =>
         acc.email.toLowerCase() === updated.email.toLowerCase() ? { ...acc, user: updated } : acc
       );
       save(STORAGE_KEYS.accounts, updatedAccounts);
+
+      // Cloud profile update if Supabase is active
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("profiles").update({
+          first_name: updated.firstName,
+          last_name: updated.lastName,
+          profession: updated.profession,
+          experience: updated.experience,
+          currency: updated.currency,
+          business_name: updated.businessName,
+          website: updated.website,
+          phone: updated.phone,
+          location: updated.location,
+          logo_url: updated.logoUrl,
+          primary_color: updated.primaryColor,
+          color_mode: updated.colorMode,
+          gradient_from: updated.gradientFrom,
+          gradient_to: updated.gradientTo,
+          gradient_angle: updated.gradientAngle,
+          hide_watermark: updated.hideWatermark,
+          tagline: updated.tagline,
+          upi_id: updated.upiId,
+          upi_name: updated.upiName,
+          bank_name: updated.bankName,
+          account_number: updated.accountNumber,
+          ifsc_code: updated.ifscCode,
+          subscription: updated.subscription,
+          usage_this_month: updated.usageThisMonth,
+        }).eq("id", updated.id).then();
+      }
+
       return updated;
     });
   }, []);
@@ -188,6 +392,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         acc.email.toLowerCase() === updated.email.toLowerCase() ? { ...acc, user: updated } : acc
       );
       save(STORAGE_KEYS.accounts, updatedAccounts);
+
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("profiles").update({
+          profession: updated.profession,
+          experience: updated.experience,
+          currency: updated.currency,
+          business_name: updated.businessName,
+        }).eq("id", updated.id).then();
+      }
+
       return updated;
     });
   }, []);
@@ -202,6 +416,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createdAt: now, updatedAt: now, ...data,
     };
     setProposals((prev) => [p, ...prev]);
+
+    if (isSupabaseConfigured && supabase && user) {
+      supabase.from("proposals").insert({
+        id: p.id,
+        user_id: user.id,
+        project_name: p.projectName,
+        client_name: p.clientName || "Client",
+        client_email: p.clientEmail,
+        status: p.status,
+        price: p.price,
+        currency: p.currency,
+        pricing_model: p.pricingModel,
+        template_id: p.templateId || "modern-minimal",
+        public_token: p.publicToken,
+        content: p.content,
+        brief_analysis: p.briefAnalysis,
+      }).then();
+    }
+
     return p;
   }, [user]);
 
@@ -209,10 +442,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProposals((prev) =>
       prev.map((p) => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)
     );
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from("proposals").update({
+        project_name: updates.projectName,
+        client_name: updates.clientName,
+        status: updates.status,
+        price: updates.price,
+        content: updates.content,
+        view_count: updates.viewCount,
+        viewed_at: updates.viewedAt,
+        accepted_at: updates.acceptedAt,
+        rejected_at: updates.rejectedAt,
+        rejection_reason: updates.rejectionReason,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id).then();
+    }
   }, []);
 
   const deleteProposal = useCallback((id: string) => {
     setProposals((prev) => prev.filter((p) => p.id !== id));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from("proposals").delete().eq("id", id).then();
+    }
   }, []);
 
   const duplicateProposal = useCallback((id: string): Proposal => {
@@ -228,8 +480,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       viewCount: 0, createdAt: now, updatedAt: now,
     };
     setProposals((prev) => [dup, ...prev]);
+
+    if (isSupabaseConfigured && supabase && user) {
+      supabase.from("proposals").insert({
+        id: dup.id,
+        user_id: user.id,
+        project_name: dup.projectName,
+        client_name: dup.clientName || "Client",
+        client_email: dup.clientEmail,
+        status: dup.status,
+        price: dup.price,
+        currency: dup.currency,
+        pricing_model: dup.pricingModel,
+        template_id: dup.templateId || "modern-minimal",
+        content: dup.content,
+      }).then();
+    }
+
     return dup;
-  }, [proposals]);
+  }, [proposals, user]);
 
   const getProposal = useCallback((id: string) => proposals.find((p) => p.id === id), [proposals]);
 
@@ -247,15 +516,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const c: Client = { id: generateId(), userId: user?.id || "user", name: "", createdAt: now, updatedAt: now, ...data };
     setClients((prev) => [c, ...prev]);
+
+    if (isSupabaseConfigured && supabase && user) {
+      supabase.from("clients").insert({
+        id: c.id,
+        user_id: user.id,
+        name: c.name,
+        email: c.email,
+        company: c.company,
+        phone: c.phone,
+        status: c.status,
+        total_revenue: c.totalRevenue,
+        currency: c.currency,
+      }).then();
+    }
+
     return c;
   }, [user]);
 
   const updateClient = useCallback((id: string, updates: Partial<Client>) => {
     setClients((prev) => prev.map((c) => c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from("clients").update({
+        name: updates.name,
+        email: updates.email,
+        company: updates.company,
+        phone: updates.phone,
+        status: updates.status,
+        total_revenue: updates.totalRevenue,
+      }).eq("id", id).then();
+    }
   }, []);
 
   const deleteClient = useCallback((id: string) => {
     setClients((prev) => prev.filter((c) => c.id !== id));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from("clients").delete().eq("id", id).then();
+    }
   }, []);
 
   const getClient = useCallback((id: string) => clients.find((c) => c.id === id), [clients]);
