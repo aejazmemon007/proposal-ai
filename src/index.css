@@ -1,0 +1,159 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display:ital@0;1&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: 'DM Serif Display', Georgia, serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-sidebar: var(--sidebar);
+}
+
+:root {
+  --background: #fafaf8;
+  --foreground: #0f0f12;
+  --card: #ffffff;
+  --card-foreground: #0f0f12;
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f2;
+  --secondary-foreground: #0f0f12;
+  --muted: #f0f0ee;
+  --muted-foreground: #6b6b7a;
+  --accent: #7c3aed;
+  --accent-foreground: #ffffff;
+  --border: #e5e5eb;
+  --ring: #7c3aed;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --sidebar: #f4f4f2;
+}
+
+.dark {
+  --background: #0c0c11;
+  --foreground: #f0f0ed;
+  --card: #141420;
+  --card-foreground: #f0f0ed;
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+  --secondary: #1a1a28;
+  --secondary-foreground: #c4c4d0;
+  --muted: #18181f;
+  --muted-foreground: #70708a;
+  --accent: #8b5cf6;
+  --accent-foreground: #ffffff;
+  --border: #1f1f2b;
+  --ring: #8b5cf6;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #f87171;
+  --sidebar: #101018;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar { width: 4px; height: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 2px; }
+
+.font-display { font-family: 'DM Serif Display', Georgia, serif; }
+
+.proposal-preview {
+  font-family: 'Instrument Sans', sans-serif;
+  line-height: 1.7;
+}
+
+@media print {
+  .no-print, nav, header, button, .sticky { display: none !important; }
+  body { 
+    background: #ffffff !important; 
+    color: #000000 !important; 
+    font-size: 11pt;
+  }
+  .proposal-preview { 
+    max-width: 100% !important; 
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  h1, h2, h3 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  @page {
+    margin: 1.5cm;
+    size: auto;
+  }
+}
+
+.step-connector { flex: 1; height: 1px; background-color: var(--border); }
+.step-connector.active { background-color: var(--primary); }
+
+.ai-glow { box-shadow: 0 0 0 1px var(--primary), 0 4px 24px -4px color-mix(in srgb, var(--primary) 30%, transparent); }
+
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes pulse-ring {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.animate-pulse-ring { animation: pulse-ring 2s ease-in-out infinite; }
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in { animation: fade-in 0.4s ease-out forwards; }

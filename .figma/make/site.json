@@ -1,0 +1,10 @@
+{
+  "description": "Generates customized content or designs based on user prompts, enabling quick and tailored creative outputs for diverse professional needs.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

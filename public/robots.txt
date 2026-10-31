@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /login
+Allow: /signup
+
+Sitemap: https://proposalai.app/sitemap.xml
