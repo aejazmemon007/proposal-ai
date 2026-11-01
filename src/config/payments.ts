@@ -16,15 +16,15 @@ export interface FreePaymentConfig {
 
 export const FREE_PAYMENT_CONFIG: FreePaymentConfig = {
   // Edit this with your real UPI ID (from Google Pay, PhonePe, Paytm, or BHIM)
-  upiId: "proposal.ai@upi",
-  merchantName: "ProposalAI",
-  accountHolder: "ProposalAI Studio",
+  upiId: "aejazrocks618@oksbi",
+  merchantName: "Aejaz Memon",
+  accountHolder: "Aejaz Memon",
 
   // Direct Bank Transfer details (0% fees via IMPS / NEFT / RTGS)
-  bankName: "HDFC Bank",
-  accountNumber: "50200098765432",
+  bankName: "State Bank of India",
+  accountNumber: "",
   ifscCode: "HDFC0000123",
-  branch: "Bangalore Central Branch",
+  branch: "Ahmedabad Main Branch",
 
   instructions: "Scan the dynamic QR code with Google Pay, PhonePe, Paytm, or CRED to pay with 0% platform fee.",
 };
