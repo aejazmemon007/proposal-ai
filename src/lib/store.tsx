@@ -1,8 +1,24 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import type {
   User, Proposal, Client, Notification, ProposalStatus, PricingModel, ProposalStyle
 } from "../types";
+
+const FAKE_DOMAINS = [
+  "test.com", "example.com", "dummy.com", "fake.com", "asdf.com",
+  "123.com", "sample.com", "tempmail.com", "mailinator.com", "yopmail.com",
+  "test.in", "example.org", "example.net", "test.org", "dummy.org"
+];
+
+export function isRealEmail(email: string): boolean {
+  const clean = email.trim().toLowerCase();
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(clean)) return false;
+  const domain = clean.split("@")[1];
+  if (!domain || FAKE_DOMAINS.includes(domain)) return false;
+  if (clean.startsWith("test@") || clean.startsWith("dummy@") || clean.startsWith("fake@")) return false;
+  return true;
+}
 
 const STORAGE_KEYS = {
   user: "pai_user",
@@ -81,6 +97,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [darkMode, setDarkMode] = useState<boolean>(() => load<boolean>(STORAGE_KEYS.darkMode, false));
   const [notifications, setNotifications] = useState<Notification[]>(() => load<Notification[]>(STORAGE_KEYS.notifications, []));
 
+  // One-time startup sanitization: purge any legacy dummy test accounts and orphan test proposals
+  useEffect(() => {
+    try {
+      const rawAccounts = localStorage.getItem(STORAGE_KEYS.accounts);
+      if (rawAccounts) {
+        const parsed = JSON.parse(rawAccounts);
+        if (Array.isArray(parsed)) {
+          const validAccounts = parsed.filter((a: any) => isRealEmail(a.email) && a.password && a.password.length >= 6);
+          if (validAccounts.length !== parsed.length) {
+            localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(validAccounts));
+          }
+        }
+      }
+
+      const rawProposals = localStorage.getItem(STORAGE_KEYS.proposals);
+      if (rawProposals) {
+        const parsed = JSON.parse(rawProposals);
+        if (Array.isArray(parsed)) {
+          const validProposals = parsed.filter((p: any) => 
+            p.userId && p.userId !== "dummy" && p.userId !== "user" && !p.projectName?.includes("SaaS Dashboard Redesign")
+          );
+          if (validProposals.length !== parsed.length) {
+            localStorage.setItem(STORAGE_KEYS.proposals, JSON.stringify(validProposals));
+            setProposals(validProposals);
+          }
+        }
+      }
+
+      const rawClients = localStorage.getItem(STORAGE_KEYS.clients);
+      if (rawClients) {
+        const parsed = JSON.parse(rawClients);
+        if (Array.isArray(parsed)) {
+          const validClients = parsed.filter((c: any) => c.userId && c.userId !== "dummy" && c.userId !== "user");
+          if (validClients.length !== parsed.length) {
+            localStorage.setItem(STORAGE_KEYS.clients, JSON.stringify(validClients));
+            setClients(validClients);
+          }
+        }
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark");
@@ -99,9 +157,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await new Promise((r) => setTimeout(r, 600));
 
     const cleanEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      throw new Error("Please enter a valid email address.");
+    if (!cleanEmail || !isRealEmail(cleanEmail)) {
+      throw new Error("Please enter a valid, authentic email address (e.g. yourname@gmail.com). Test or dummy email domains are not allowed.");
     }
     if (!password) {
       throw new Error("Please enter your password.");
@@ -253,15 +310,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const cleanFirst = firstName.trim();
     const cleanLast = lastName.trim();
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      throw new Error("Please enter a valid email address.");
+    if (!cleanEmail || !isRealEmail(cleanEmail)) {
+      throw new Error("Please enter a valid, authentic email address (e.g. yourname@gmail.com). Test and dummy domains are not permitted.");
     }
-    if (!cleanFirst || !cleanLast) {
-      throw new Error("Please enter both your first and last name.");
+    if (cleanFirst.length < 2 || cleanLast.length < 2) {
+      throw new Error("Please enter both your real first and last name (at least 2 letters each).");
     }
-    if (password.length < 6) {
-      throw new Error("Password must be at least 6 characters.");
+    const dummyNamePattern = /^(test|dummy|asdf|fake|sample|none|user|admin)$/i;
+    if (dummyNamePattern.test(cleanFirst) || dummyNamePattern.test(cleanLast)) {
+      throw new Error("Dummy personal names (test, dummy, asdf) are not permitted. Please enter your real name.");
+    }
+    if (password.length < 8) {
+      throw new Error("Password must be at least 8 characters long for account security.");
     }
 
     // 1. Cloud Database (Supabase) if configured
@@ -572,9 +632,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => prev ? { ...prev, usageThisMonth: prev.usageThisMonth + 1 } : prev);
   }, []);
 
+  // Strict user isolation: users only see their own real proposals and clients
+  const userProposals = useMemo(() => {
+    if (!user) return [];
+    return proposals.filter((p) => p.userId === user.id);
+  }, [proposals, user]);
+
+  const userClients = useMemo(() => {
+    if (!user) return [];
+    return clients.filter((c) => c.userId === user.id);
+  }, [clients, user]);
+
   return (
     <AppContext.Provider value={{
-      user, isAuthenticated: !!user, proposals, clients, darkMode, notifications,
+      user, isAuthenticated: !!user, proposals: userProposals, clients: userClients, darkMode, notifications,
       login, signup, logout, updateUser, completeOnboarding,
       createProposal, updateProposal, deleteProposal, duplicateProposal, getProposal, saveProposalDirectly,
       createClient, updateClient, deleteClient, getClient,

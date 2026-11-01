@@ -5,7 +5,7 @@ import {
   Tag, ArrowRight, ArrowLeft, AlertCircle, Loader2, Zap, HelpCircle,
   Copy, CheckCircle2, QrCode, ExternalLink
 } from "lucide-react";
-import { useApp } from "../lib/store";
+import { useApp, isRealEmail } from "../lib/store";
 import { FREE_PAYMENT_CONFIG, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
 import { CURRENCY_SYMBOLS } from "../types";
 import type { SubscriptionPlan } from "../types";
@@ -93,11 +93,14 @@ export default function Checkout() {
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedBank, setCopiedBank] = useState(false);
 
-  // Card details
-  const [cardNumber, setCardNumber] = useState("4242 •••• •••• 4242");
-  const [cardExpiry, setCardExpiry] = useState("12/28");
-  const [cardCvv, setCardCvv] = useState("888");
+  // Card details (empty by default, requires real valid card)
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
   const [cardName, setCardName] = useState(fullName);
+
+  // Real payment validation error state
+  const [paymentError, setPaymentError] = useState("");
 
   // Bank selection
   const [selectedBank, setSelectedBank] = useState("hdfc");
@@ -147,6 +150,64 @@ export default function Checkout() {
 
   const handleCompletePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPaymentError("");
+
+    // 1. Strict Validation of Customer Billing Information
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !isRealEmail(cleanEmail)) {
+      setPaymentError("Please enter a valid, authentic email address (e.g. yourname@gmail.com). Test or dummy domains are not allowed.");
+      return;
+    }
+
+    const nameParts = fullName.trim().split(/\s+/);
+    if (nameParts.length < 2 || nameParts[0].length < 2 || nameParts[1].length < 2) {
+      setPaymentError("Please enter your real full name (first and last name) for your billing receipt.");
+      return;
+    }
+
+    // 2. Strict Payment Verification Checks
+    if (paymentMethod === "upi") {
+      const cleanUtr = utrNumber.trim();
+      if (!cleanUtr) {
+        setPaymentError(
+          `Payment Verification Required: Please complete your payment of ₹${total.toLocaleString()} using Google Pay, PhonePe, or Paytm, and enter your 12-digit UPI / UTR Transaction ID from your payment receipt.`
+        );
+        return;
+      }
+      if (!/^\d{12}$/.test(cleanUtr)) {
+        setPaymentError(
+          "Invalid UTR Transaction ID: Standard NPCI UPI transaction reference numbers must be exactly 12 numeric digits (e.g. 423891048291). Please verify on your UPI receipt."
+        );
+        return;
+      }
+    } else if (paymentMethod === "netbanking") {
+      const cleanRef = utrNumber.trim();
+      if (!cleanRef || cleanRef.length < 8) {
+        setPaymentError(
+          "Payment Reference Required: Please enter your bank transfer IMPS/NEFT/RTGS transaction reference number (at least 8 alphanumeric characters)."
+        );
+        return;
+      }
+    } else if (paymentMethod === "card") {
+      const cleanCard = cardNumber.replace(/\s+/g, "");
+      if (!/^\d{16}$/.test(cleanCard)) {
+        setPaymentError("Invalid Card: Please enter a real 16-digit debit or credit card number.");
+        return;
+      }
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry.trim())) {
+        setPaymentError("Invalid Expiry: Please enter a valid card expiration date in MM/YY format.");
+        return;
+      }
+      if (!/^\d{3,4}$/.test(cardCvv.trim())) {
+        setPaymentError("Invalid CVV: Please enter the 3-digit security code on the back of your card.");
+        return;
+      }
+      if (!cardName.trim()) {
+        setPaymentError("Please enter the cardholder name exactly as printed on the card.");
+        return;
+      }
+    }
+
     setIsProcessing(true);
     setProcessingStep(1);
 
@@ -507,18 +568,24 @@ export default function Checkout() {
                   {/* UTR / Reference Number Input */}
                   <div className="pt-2">
                     <label className="block text-xs font-semibold text-foreground mb-1.5 flex items-center justify-between">
-                      <span>UPI Reference Number / UTR (Optional)</span>
-                      <span className="text-[11px] text-muted-foreground font-normal">Found in payment details</span>
+                      <span>12-Digit UPI / UTR Transaction ID <span className="text-danger font-bold">*Required</span></span>
+                      <span className="text-[11px] text-muted-foreground font-normal">Found in your payment app receipt</span>
                     </label>
                     <input
                       type="text"
+                      required
                       value={utrNumber}
-                      onChange={(e) => setUtrNumber(e.target.value)}
+                      onChange={(e) => {
+                        setUtrNumber(e.target.value);
+                        setPaymentError("");
+                      }}
                       placeholder="e.g. 423891048291 (12 digits)"
-                      className="w-full bg-muted/50 border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono placeholder:font-sans"
+                      className={`w-full bg-muted/50 border rounded-xl px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono placeholder:font-sans ${
+                        paymentError && !utrNumber ? "border-danger ring-1 ring-danger/30" : "border-border"
+                      }`}
                     />
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      Paste the 12-digit UTR/UPI reference code after paying to expedite verification.
+                      After paying via Google Pay, PhonePe, or Paytm, paste the 12-digit UTR/UPI reference code to verify and activate your plan.
                     </p>
                   </div>
                 </div>
@@ -600,8 +667,11 @@ export default function Checkout() {
                         type="text"
                         required
                         value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        placeholder="4242 4242 4242 4242"
+                        onChange={(e) => {
+                          setCardNumber(e.target.value);
+                          setPaymentError("");
+                        }}
+                        placeholder="•••• •••• •••• •••• (16 digits)"
                         className="w-full bg-muted/50 border border-border rounded-xl pl-3.5 pr-12 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
                       />
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -618,7 +688,10 @@ export default function Checkout() {
                         type="text"
                         required
                         value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
+                        onChange={(e) => {
+                          setCardExpiry(e.target.value);
+                          setPaymentError("");
+                        }}
                         placeholder="MM/YY"
                         className="w-full bg-muted/50 border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
                       />
@@ -633,7 +706,10 @@ export default function Checkout() {
                         required
                         maxLength={4}
                         value={cardCvv}
-                        onChange={(e) => setCardCvv(e.target.value)}
+                        onChange={(e) => {
+                          setCardCvv(e.target.value);
+                          setPaymentError("");
+                        }}
                         placeholder="•••"
                         className="w-full bg-muted/50 border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
                       />
@@ -646,8 +722,11 @@ export default function Checkout() {
                       type="text"
                       required
                       value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                      placeholder="John Doe"
+                      onChange={(e) => {
+                        setCardName(e.target.value);
+                        setPaymentError("");
+                      }}
+                      placeholder="Cardholder full name"
                       className="w-full bg-muted/50 border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                   </div>
@@ -740,6 +819,14 @@ export default function Checkout() {
                   </div>
                 </div>
               </div>
+
+              {/* Payment Validation Error Banner */}
+              {paymentError && (
+                <div className="p-3.5 mb-4 bg-danger/10 border border-danger/30 rounded-xl text-xs text-danger flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-danger" />
+                  <span className="leading-relaxed font-medium">{paymentError}</span>
+                </div>
+              )}
 
               {/* Submit CTA */}
               <button

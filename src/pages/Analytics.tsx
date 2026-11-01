@@ -105,10 +105,10 @@ export default function Analytics() {
 
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        <MetricCard label="Total Proposals" value={String(metrics.total)} icon={FileText} trend="+3 this month" trendUp />
-        <MetricCard label="View Rate" value={`${metrics.viewRate}%`} icon={Eye} sub={`${metrics.viewed} of ${metrics.sent} sent`} trend="+8%" trendUp />
-        <MetricCard label="Win Rate" value={`${metrics.winRate}%`} icon={Check} sub={`${metrics.accepted} accepted`} trend="+5%" trendUp />
-        <MetricCard label="Won Value" value={`${sym}${(metrics.totalValue / 1000).toFixed(0)}k`} icon={TrendingUp} sub={`avg ${sym}${metrics.avgValue.toLocaleString()}`} trend="+22%" trendUp />
+        <MetricCard label="Total Proposals" value={String(metrics.total)} icon={FileText} sub="All active proposals" />
+        <MetricCard label="View Rate" value={`${metrics.viewRate}%`} icon={Eye} sub={`${metrics.viewed} of ${metrics.sent} sent`} />
+        <MetricCard label="Win Rate" value={`${metrics.winRate}%`} icon={Check} sub={`${metrics.accepted} deals won`} />
+        <MetricCard label="Won Value" value={`${sym}${(metrics.totalValue / 1000).toFixed(0)}k`} icon={TrendingUp} sub={`Avg ${sym}${metrics.avgValue.toLocaleString()}`} />
       </div>
 
       {/* Charts row */}

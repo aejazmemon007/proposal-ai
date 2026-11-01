@@ -138,12 +138,12 @@ export default function Dashboard() {
 
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-8">
-        <MetricCard label="Total Proposals" value={String(metrics.total)} trend="+3 this month" trendUp />
-        <MetricCard label="Sent" value={String(metrics.sent)} sub="via link or email" />
-        <MetricCard label="Viewed" value={String(metrics.viewed)} trend="+18% vs last month" trendUp />
-        <MetricCard label="Accepted" value={String(metrics.accepted)} trend="+1 this month" trendUp />
-        <MetricCard label="Win Rate" value={`${metrics.winRate}%`} trend="vs 42% last month" trendUp={metrics.winRate >= 42} />
-        <MetricCard label="Won Value" value={formatCurrency(metrics.totalValue, currency)} trend={`+${sym}12k this month`} trendUp />
+        <MetricCard label="Total Proposals" value={String(metrics.total)} sub="Created so far" />
+        <MetricCard label="Sent" value={String(metrics.sent)} sub="Delivered to clients" />
+        <MetricCard label="Viewed" value={String(metrics.viewed)} sub="Opened by clients" />
+        <MetricCard label="Accepted" value={String(metrics.accepted)} sub="Agreements signed" />
+        <MetricCard label="Win Rate" value={`${metrics.winRate}%`} sub={metrics.sent > 0 ? "Conversion rate" : "0 sent proposals"} />
+        <MetricCard label="Won Value" value={formatCurrency(metrics.totalValue, currency)} sub="Total closed revenue" />
       </div>
 
       {/* Proposals */}

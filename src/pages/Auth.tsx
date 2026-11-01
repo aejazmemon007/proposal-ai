@@ -7,6 +7,22 @@ interface AuthProps {
   mode: "login" | "signup";
 }
 
+const FAKE_DOMAINS = [
+  "test.com", "example.com", "dummy.com", "fake.com", "asdf.com",
+  "123.com", "sample.com", "tempmail.com", "mailinator.com", "yopmail.com",
+  "test.in", "example.org", "example.net", "test.org", "dummy.org"
+];
+
+function isRealEmail(email: string): boolean {
+  const clean = email.trim().toLowerCase();
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(clean)) return false;
+  const domain = clean.split("@")[1];
+  if (!domain || FAKE_DOMAINS.includes(domain)) return false;
+  if (clean.startsWith("test@") || clean.startsWith("dummy@") || clean.startsWith("fake@")) return false;
+  return true;
+}
+
 export default function Auth({ mode }: AuthProps) {
   const { login, signup } = useApp();
   const navigate = useNavigate();
@@ -21,10 +37,37 @@ export default function Auth({ mode }: AuthProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim() || !password) { setError("Please fill in all fields."); return; }
-    if (!emailRegex.test(email.trim())) { setError("Please enter a valid email address."); return; }
-    if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
+
+    if (!email.trim() || !password) {
+      setError("Please fill in both email and password.");
+      return;
+    }
+
+    if (!isRealEmail(email)) {
+      setError("Please enter a real, authentic email address (e.g. yourname@gmail.com, outlook.com, or your corporate domain). Dummy and test email domains are not permitted.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long for account security.");
+      return;
+    }
+
+    if (mode === "signup") {
+      const cleanFirst = firstName.trim();
+      const cleanLast = lastName.trim();
+
+      if (cleanFirst.length < 2 || cleanLast.length < 2) {
+        setError("Please enter your real first and last name (at least 2 letters each).");
+        return;
+      }
+
+      const dummyNamePattern = /^(test|dummy|asdf|fake|sample|none|user|admin)$/i;
+      if (dummyNamePattern.test(cleanFirst) || dummyNamePattern.test(cleanLast)) {
+        setError("Dummy names (test, dummy, asdf) are not permitted. Please use your real name.");
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -32,19 +75,14 @@ export default function Auth({ mode }: AuthProps) {
         await login(email, password);
         navigate("/dashboard");
       } else {
-        if (!firstName.trim() || !lastName.trim()) {
-          setError("Please enter both your first and last name.");
-          setLoading(false);
-          return;
-        }
-        await signup(email, password, firstName, lastName);
+        await signup(email, password, firstName.trim(), lastName.trim());
         navigate("/onboarding");
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError("Something went wrong. Please check your credentials and try again.");
+        setError("Invalid credentials. Please verify your email & password or create an account.");
       }
     } finally {
       setLoading(false);
