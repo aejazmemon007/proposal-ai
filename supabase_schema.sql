@@ -95,43 +95,53 @@ ALTER TABLE public.proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
--- 6. Policies for Profiles
+-- 6. Policies for Profiles (Safe Idempotent Policy Management)
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
   ON public.profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile"
   ON public.profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
 -- 7. Policies for Proposals
+DROP POLICY IF EXISTS "Users can manage their own proposals" ON public.proposals;
 CREATE POLICY "Users can manage their own proposals"
   ON public.proposals FOR ALL
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Public can view proposals via public token" ON public.proposals;
 CREATE POLICY "Public can view proposals via public token"
   ON public.proposals FOR SELECT
   USING (public_token IS NOT NULL);
 
 -- 8. Policies for Clients
+DROP POLICY IF EXISTS "Users can manage their own clients" ON public.clients;
 CREATE POLICY "Users can manage their own clients"
   ON public.clients FOR ALL
   USING (auth.uid() = user_id);
 
 -- 9. Policies for Transactions
+DROP POLICY IF EXISTS "Users can view their own transactions" ON public.transactions;
 CREATE POLICY "Users can view their own transactions"
   ON public.transactions FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert transactions on checkout" ON public.transactions;
 CREATE POLICY "Users can insert transactions on checkout"
   ON public.transactions FOR INSERT
   WITH CHECK (true);
 
--- Optional: Auto-create profile trigger on signup
+-- 10. Auto-create profile trigger on signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -147,7 +157,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE TRIGGER on_auth_user_created
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
