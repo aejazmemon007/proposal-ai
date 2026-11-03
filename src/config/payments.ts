@@ -30,6 +30,23 @@ export const FREE_PAYMENT_CONFIG: FreePaymentConfig = {
 };
 
 /**
+ * Returns active admin payment configuration (loads overrides from admin settings if present)
+ */
+export function getActivePaymentConfig(): FreePaymentConfig {
+  try {
+    const saved = localStorage.getItem("pai_admin_payment_config");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...FREE_PAYMENT_CONFIG,
+        ...parsed,
+      };
+    }
+  } catch {}
+  return FREE_PAYMENT_CONFIG;
+}
+
+/**
  * Builds the official NPCI UPI Deep Link / Intent URL
  * Supported by all Indian payment apps (GPay, PhonePe, Paytm, CRED, BHIM)
  */

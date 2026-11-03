@@ -6,7 +6,7 @@ import {
   Copy, CheckCircle2, QrCode, ExternalLink
 } from "lucide-react";
 import { useApp, isRealEmail } from "../lib/store";
-import { FREE_PAYMENT_CONFIG, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
+import { FREE_PAYMENT_CONFIG, getActivePaymentConfig, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
 import { CURRENCY_SYMBOLS } from "../types";
 import type { SubscriptionPlan } from "../types";
 
@@ -88,7 +88,8 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState<"upi" | "card" | "netbanking">("upi");
 
   // Free UPI & Direct Bank states
-  const effectiveUpiId = FREE_PAYMENT_CONFIG.upiId;
+  const activePaymentConfig = getActivePaymentConfig();
+  const effectiveUpiId = activePaymentConfig.upiId;
   const [utrNumber, setUtrNumber] = useState("");
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedBank, setCopiedBank] = useState(false);
@@ -249,6 +250,22 @@ export default function Checkout() {
       const orderId = `PAI-2026-${Math.floor(10000 + Math.random() * 90000)}`;
       const orderDate = new Date().toISOString();
 
+      try {
+        const invKey = "pai_invoices_" + (user?.id || "guest");
+        const existingInvoices = JSON.parse(localStorage.getItem(invKey) || "[]");
+        existingInvoices.unshift({
+          orderId,
+          date: orderDate,
+          plan: plan.name,
+          planId: selectedPlan,
+          amount: total,
+          paymentMethod: paymentMethod === "upi" ? "UPI" : paymentMethod === "netbanking" ? "Net Banking" : "Card",
+          utrNumber: utrNumber || undefined,
+          status: "Paid",
+        });
+        localStorage.setItem(invKey, JSON.stringify(existingInvoices));
+      } catch {}
+
       navigate("/thank-you", {
         state: {
           orderId,
@@ -263,7 +280,7 @@ export default function Checkout() {
           paymentMethod: paymentMethod === "upi"
             ? `UPI (${effectiveUpiId})${utrNumber ? ` · Ref: ${utrNumber}` : ""}`
             : paymentMethod === "netbanking"
-            ? `Direct Bank Wire (${FREE_PAYMENT_CONFIG.bankName})${utrNumber ? ` · Ref: ${utrNumber}` : ""}`
+            ? `Direct Bank Wire (${activePaymentConfig.bankName})${utrNumber ? ` · Ref: ${utrNumber}` : ""}`
             : `Card ending in ${cardNumber.slice(-4)}`,
           customerName: fullName,
           customerEmail: email,
@@ -277,7 +294,7 @@ export default function Checkout() {
   // Generate dynamic 0% fee UPI payment URL and scannable QR Code
   const upiPayUrl = buildUpiIntentUrl({
     upiId: effectiveUpiId,
-    merchantName: FREE_PAYMENT_CONFIG.merchantName,
+    merchantName: activePaymentConfig.merchantName,
     amount: total,
     transactionNote: `ProposalAI ${plan.name} Plan`,
   });
@@ -603,34 +620,36 @@ export default function Checkout() {
                     <div className="grid sm:grid-cols-2 gap-3 text-xs">
                       <div className="p-2.5 bg-card border border-border rounded-xl">
                         <span className="text-[10px] text-muted-foreground block uppercase font-medium">Bank Name</span>
-                        <span className="font-semibold text-foreground">{FREE_PAYMENT_CONFIG.bankName}</span>
+                        <span className="font-semibold text-foreground">{activePaymentConfig.bankName}</span>
                       </div>
                       <div className="p-2.5 bg-card border border-border rounded-xl">
                         <span className="text-[10px] text-muted-foreground block uppercase font-medium">Account Holder</span>
-                        <span className="font-semibold text-foreground">{FREE_PAYMENT_CONFIG.accountHolder}</span>
+                        <span className="font-semibold text-foreground">{activePaymentConfig.accountHolder}</span>
                       </div>
                       <div className="p-2.5 bg-card border border-border rounded-xl flex items-center justify-between">
                         <div>
                           <span className="text-[10px] text-muted-foreground block uppercase font-medium">Account Number</span>
-                          <span className="font-mono font-bold text-foreground">{FREE_PAYMENT_CONFIG.accountNumber}</span>
+                          <span className="font-mono font-bold text-foreground">{activePaymentConfig.accountNumber || "Provided on Request"}</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyBank(FREE_PAYMENT_CONFIG.accountNumber)}
-                          className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors cursor-pointer"
-                          title="Copy Account Number"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
+                        {activePaymentConfig.accountNumber && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyBank(activePaymentConfig.accountNumber)}
+                            className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors cursor-pointer"
+                            title="Copy Account Number"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                       <div className="p-2.5 bg-card border border-border rounded-xl flex items-center justify-between">
                         <div>
                           <span className="text-[10px] text-muted-foreground block uppercase font-medium">IFSC Code</span>
-                          <span className="font-mono font-bold text-foreground">{FREE_PAYMENT_CONFIG.ifscCode}</span>
+                          <span className="font-mono font-bold text-foreground">{activePaymentConfig.ifscCode}</span>
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleCopyBank(FREE_PAYMENT_CONFIG.ifscCode)}
+                          onClick={() => handleCopyBank(activePaymentConfig.ifscCode)}
                           className="p-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors cursor-pointer"
                           title="Copy IFSC Code"
                         >
@@ -640,7 +659,7 @@ export default function Checkout() {
                     </div>
 
                     <p className="text-[11px] text-muted-foreground pt-1">
-                      Branch: {FREE_PAYMENT_CONFIG.branch} · Transfer ₹{total.toLocaleString()} via your net banking portal or mobile app.
+                      Branch: {activePaymentConfig.branch} · Transfer ₹{total.toLocaleString()} via your net banking portal or mobile app.
                     </p>
                   </div>
 

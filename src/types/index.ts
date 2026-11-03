@@ -8,6 +8,7 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
+  role?: "admin" | "user";
   profession?: string;
   experience?: string;
   currency: string;
@@ -31,6 +32,19 @@ export interface User {
   subscription: SubscriptionPlan;
   usageThisMonth: number;
   onboardingComplete: boolean;
+}
+
+export function isPlatformAdmin(user: User | null | undefined): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  const email = (user.email || "").toLowerCase().trim();
+  return (
+    email === "aejazrocks618@gmail.com" ||
+    email === "aejazmemon007@gmail.com" ||
+    email.startsWith("aejaz") ||
+    email.includes("theboxux") ||
+    email.startsWith("admin@")
+  );
 }
 
 export interface ScopeItem {

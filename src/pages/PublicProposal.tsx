@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { Check, X, Sparkles, Download, AlertCircle, ChevronDown, ShieldCheck, Lock, ExternalLink, Calendar, CheckCircle2, Loader2, Smartphone, QrCode } from "lucide-react";
 import { useApp, decodeProposalPayload } from "../lib/store";
-import { FREE_PAYMENT_CONFIG, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
 import { CURRENCY_SYMBOLS } from "../types";
 import type { ProposalContent, TemplateDesignId } from "../types";
 import ProposalThemeView from "../components/ProposalThemeView";
@@ -123,13 +122,6 @@ export default function PublicProposal() {
 
   if (actionDone === "accepted") {
     const depositAmount = Math.round(proposal.price * 0.5);
-    const clientUpiUrl = buildUpiIntentUrl({
-      upiId: FREE_PAYMENT_CONFIG.upiId,
-      merchantName: FREE_PAYMENT_CONFIG.merchantName,
-      amount: depositAmount,
-      transactionNote: `Deposit - ${proposal.projectName.slice(0, 20)}`,
-    });
-    const clientQrCode = buildUpiQrCodeUrl(clientUpiUrl, 220);
 
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
@@ -150,36 +142,10 @@ export default function PublicProposal() {
             <div className="flex justify-between"><span className="text-slate-500">Confirmation Hash:</span><span className="font-mono text-slate-400">#SIG-{(Date.now()).toString(36).toUpperCase()}</span></div>
           </div>
 
-          {/* 100% Free UPI Deposit Payment Box */}
-          <div className="p-4 bg-gradient-to-b from-emerald-50/70 to-slate-50/50 border border-emerald-200/90 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between text-left">
-              <div>
-                <p className="text-xs font-bold text-slate-900">Pay 50% Project Deposit</p>
-                <p className="text-[11px] text-slate-500">Direct UPI transfer · 0% extra fee</p>
-              </div>
-              <span className="text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
-                {sym}{depositAmount.toLocaleString()}
-              </span>
-            </div>
-
-            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm inline-block mx-auto">
-              <img
-                src={clientQrCode}
-                alt="Scan to Pay Deposit via UPI"
-                className="w-36 h-36 object-contain mx-auto rounded"
-              />
-            </div>
-
-            <a
-              href={clientUpiUrl}
-              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Tap to Pay Deposit via UPI App</span>
-            </a>
-
-            <p className="text-[10px] text-slate-400 font-mono">
-              UPI ID: {FREE_PAYMENT_CONFIG.upiId}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-left space-y-1.5">
+            <p className="text-xs font-semibold text-slate-800">Next Steps</p>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              The project lead has received your formal acceptance. They will contact you shortly to coordinate kick-off and delivery.
             </p>
           </div>
 

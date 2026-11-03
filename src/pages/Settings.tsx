@@ -5,8 +5,8 @@ import {
   Upload, Image, Trash2, Lock, Sliders, RefreshCw, Eye, Smartphone, QrCode, Copy, CheckCircle2
 } from "lucide-react";
 import { useApp } from "../lib/store";
-import { FREE_PAYMENT_CONFIG, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
-import { CURRENCIES, PROFESSIONS, PLAN_PRICES, BRAND_GRADIENT_PRESETS } from "../types";
+import { FREE_PAYMENT_CONFIG, getActivePaymentConfig, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
+import { CURRENCIES, PROFESSIONS, PLAN_PRICES, BRAND_GRADIENT_PRESETS, isPlatformAdmin } from "../types";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
@@ -78,12 +78,15 @@ export default function Settings() {
   const [defaultRevisions, setDefaultRevisions] = useState("2 rounds included");
   const [defaultStyle, setDefaultStyle] = useState("professional");
 
-  // Free Direct Payment details (UPI & Bank)
-  const [upiId, setUpiId] = useState(user?.upiId || FREE_PAYMENT_CONFIG.upiId);
-  const [upiName, setUpiName] = useState(user?.upiName || user?.businessName || FREE_PAYMENT_CONFIG.merchantName);
-  const [bankName, setBankName] = useState(user?.bankName || FREE_PAYMENT_CONFIG.bankName);
-  const [accountNumber, setAccountNumber] = useState(user?.accountNumber || FREE_PAYMENT_CONFIG.accountNumber);
-  const [ifscCode, setIfscCode] = useState(user?.ifscCode || FREE_PAYMENT_CONFIG.ifscCode);
+  // Admin access check & Platform Payment details
+  const isAdmin = isPlatformAdmin(user);
+  const activeAdminConfig = getActivePaymentConfig();
+
+  const [upiId, setUpiId] = useState(user?.upiId || activeAdminConfig.upiId);
+  const [upiName, setUpiName] = useState(user?.upiName || user?.businessName || activeAdminConfig.merchantName);
+  const [bankName, setBankName] = useState(user?.bankName || activeAdminConfig.bankName);
+  const [accountNumber, setAccountNumber] = useState(user?.accountNumber || activeAdminConfig.accountNumber);
+  const [ifscCode, setIfscCode] = useState(user?.ifscCode || activeAdminConfig.ifscCode);
 
   const handleSave = (updates: object) => {
     updateUser(updates);
@@ -679,98 +682,191 @@ export default function Settings() {
                 ))}
               </div>
 
-              {/* Free Direct Payment Integration Settings */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="w-5 h-5 text-emerald-600" />
-                      <h2 className="text-base font-semibold text-foreground">Free Payment Integration (Direct UPI & Bank)</h2>
-                      <span className="text-[10px] bg-emerald-500/15 text-emerald-600 font-bold px-2 py-0.5 rounded-full">0% GATEWAY FEES</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Receive 100% direct payouts without paying 2-3% platform cuts or recurring gateway subscriptions.</p>
+              {/* Invoices & Billing History for All Users */}
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <h2 className="text-base font-semibold text-foreground">Invoices & Billing History</h2>
                   </div>
-                  <SaveButton onClick={() => handleSave({ upiId, upiName, bankName, accountNumber, ifscCode })} saved={saved} />
+                  <span className="text-[11px] text-muted-foreground font-medium">Automatic tax invoices</span>
                 </div>
 
-                <div className="grid md:grid-cols-12 gap-6">
-                  <div className="md:col-span-7 space-y-4">
-                    <div>
-                      <label className={labelClass}>Your UPI ID (VPA)</label>
-                      <input
-                        value={upiId}
-                        onChange={(e) => setUpiId(e.target.value)}
-                        placeholder="e.g. yourname@okaxis or business@upi"
-                        className={inputClass}
-                      />
-                      <p className="text-[11px] text-muted-foreground mt-1">Found in Google Pay, PhonePe, Paytm, or your bank app.</p>
-                    </div>
+                {(() => {
+                  let invoices: any[] = [];
+                  try {
+                    const raw = localStorage.getItem("pai_invoices_" + (user?.id || "guest"));
+                    if (raw) invoices = JSON.parse(raw);
+                  } catch {}
 
-                    <div>
-                      <label className={labelClass}>Merchant / Account Display Name</label>
-                      <input
-                        value={upiName}
-                        onChange={(e) => setUpiName(e.target.value)}
-                        placeholder="e.g. Acme Design Studio"
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelClass}>Bank Name</label>
-                        <input
-                          value={bankName}
-                          onChange={(e) => setBankName(e.target.value)}
-                          placeholder="e.g. HDFC Bank"
-                          className={inputClass}
-                        />
+                  if (invoices.length === 0) {
+                    return (
+                      <div className="text-center py-6 px-4 bg-muted/20 border border-dashed border-border rounded-xl">
+                        <CheckCircle2 className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-foreground">No Billing Receipts Yet</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          When you upgrade to Pro or Studio on checkout, your verified receipt and invoice will appear here.
+                        </p>
                       </div>
-                      <div>
-                        <label className={labelClass}>IFSC Code</label>
-                        <input
-                          value={ifscCode}
-                          onChange={(e) => setIfscCode(e.target.value)}
-                          placeholder="e.g. HDFC0000123"
-                          className={inputClass}
-                        />
-                      </div>
-                    </div>
+                    );
+                  }
 
-                    <div>
-                      <label className={labelClass}>Bank Account Number</label>
-                      <input
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value)}
-                        placeholder="e.g. 50200098765432"
-                        className={inputClass}
-                      />
+                  return (
+                    <div className="divide-y divide-border border border-border rounded-xl overflow-hidden">
+                      {invoices.map((inv: any, idx: number) => (
+                        <div key={inv.orderId || idx} className="p-3.5 bg-card flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-semibold text-foreground block">{inv.plan} Subscription</span>
+                            <span className="text-[11px] text-muted-foreground font-mono">{inv.orderId} · {new Date(inv.date).toLocaleDateString()}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-foreground block">₹{inv.amount}</span>
+                            <span className="text-[10px] bg-emerald-500/15 text-emerald-600 font-bold px-2 py-0.5 rounded-full inline-block mt-0.5">
+                              {inv.status || "Paid"} via {inv.paymentMethod}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
+                  );
+                })()}
+              </div>
+
+              {/* Billing FAQ & Payment Security */}
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-5 h-5 text-emerald-600" />
+                  <h3 className="text-sm font-semibold text-foreground">Payment & Billing Security</h3>
+                </div>
+                <div className="grid sm:grid-cols-3 gap-3 text-xs text-muted-foreground">
+                  <div className="p-3 bg-muted/30 border border-border rounded-xl">
+                    <p className="font-semibold text-foreground mb-1">Instant Activation</p>
+                    <p className="text-[11px] leading-relaxed">Subscriptions unlock immediately upon submitting your payment reference.</p>
                   </div>
-
-                  {/* Live Dynamic Scannable QR Preview */}
-                  <div className="md:col-span-5 bg-muted/30 border border-border rounded-2xl p-5 flex flex-col items-center justify-center text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Live Scannable QR Preview</span>
-                    <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-md mb-3">
-                      <img
-                        src={buildUpiQrCodeUrl(buildUpiIntentUrl({
-                          upiId: upiId || FREE_PAYMENT_CONFIG.upiId,
-                          merchantName: upiName || FREE_PAYMENT_CONFIG.merchantName,
-                          amount: 500,
-                          transactionNote: "Proposal Deposit"
-                        }), 180)}
-                        alt="Preview QR"
-                        className="w-36 h-36 object-contain rounded-lg"
-                      />
-                    </div>
-                    <p className="text-xs font-semibold text-foreground">{upiName || "Your Studio"}</p>
-                    <p className="text-[11px] font-mono text-muted-foreground">{upiId || "yourname@upi"}</p>
-                    <span className="inline-block mt-2 text-[10px] bg-emerald-500/15 text-emerald-600 font-semibold px-2 py-0.5 rounded-full">
-                      Scannable with any UPI App
-                    </span>
+                  <div className="p-3 bg-muted/30 border border-border rounded-xl">
+                    <p className="font-semibold text-foreground mb-1">0% Extra Fees</p>
+                    <p className="text-[11px] leading-relaxed">Direct UPI and bank transfers carry zero surcharge or gateway processing deductions.</p>
+                  </div>
+                  <div className="p-3 bg-muted/30 border border-border rounded-xl">
+                    <p className="font-semibold text-foreground mb-1">Cancel Anytime</p>
+                    <p className="text-[11px] leading-relaxed">No lock-ins. Switch to Free or change plans whenever your client volume changes.</p>
                   </div>
                 </div>
               </div>
+
+              {/* Platform Admin Only: Subscription Payment Receiving Configuration */}
+              {isAdmin && (
+                <div className="bg-card border-2 border-primary/30 rounded-2xl p-6 shadow-sm relative overflow-hidden space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-5 h-5 text-primary" />
+                        <h2 className="text-base font-semibold text-foreground">Platform Payment Receiving Settings</h2>
+                        <span className="text-[10px] bg-primary/15 text-primary font-extrabold px-2 py-0.5 rounded-full border border-primary/30">
+                          👑 ADMIN ONLY
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Configure the UPI ID and Bank Account where users' subscription payments (Pro ₹49 / Studio ₹99) are received.
+                        <span className="block text-primary text-[11px] font-medium mt-0.5">
+                          🔒 This card is strictly visible to you (Admin). Regular users cannot see this configuration.
+                        </span>
+                      </p>
+                    </div>
+                    <SaveButton onClick={() => {
+                      handleSave({ upiId, upiName, bankName, accountNumber, ifscCode });
+                      try {
+                        localStorage.setItem("pai_admin_payment_config", JSON.stringify({
+                          upiId,
+                          merchantName: upiName,
+                          accountHolder: upiName,
+                          bankName,
+                          accountNumber,
+                          ifscCode,
+                        }));
+                      } catch {}
+                    }} saved={saved} />
+                  </div>
+
+                  <div className="grid md:grid-cols-12 gap-6">
+                    <div className="md:col-span-7 space-y-4">
+                      <div>
+                        <label className={labelClass}>Receiving UPI ID (VPA)</label>
+                        <input
+                          value={upiId}
+                          onChange={(e) => setUpiId(e.target.value)}
+                          placeholder="e.g. aejazrocks618@oksbi"
+                          className={inputClass}
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">Found in Google Pay, PhonePe, Paytm, or your bank app. Used on /checkout.</p>
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>Merchant / Account Display Name</label>
+                        <input
+                          value={upiName}
+                          onChange={(e) => setUpiName(e.target.value)}
+                          placeholder="e.g. The Box Ux"
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelClass}>Bank Name</label>
+                          <input
+                            value={bankName}
+                            onChange={(e) => setBankName(e.target.value)}
+                            placeholder="e.g. State Bank of India"
+                            className={inputClass}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>IFSC Code</label>
+                          <input
+                            value={ifscCode}
+                            onChange={(e) => setIfscCode(e.target.value)}
+                            placeholder="e.g. HDFC0000123"
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>Bank Account Number</label>
+                        <input
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          placeholder="e.g. 50200098765432"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live Scannable QR Preview for Checkout */}
+                    <div className="md:col-span-5 bg-muted/30 border border-border rounded-2xl p-5 flex flex-col items-center justify-center text-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Live Scannable Checkout QR Preview</span>
+                      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-md mb-3">
+                        <img
+                          src={buildUpiQrCodeUrl(buildUpiIntentUrl({
+                            upiId: upiId || FREE_PAYMENT_CONFIG.upiId,
+                            merchantName: upiName || FREE_PAYMENT_CONFIG.merchantName,
+                            amount: 49,
+                            transactionNote: "ProposalAI Pro Subscription"
+                          }), 180)}
+                          alt="Preview QR"
+                          className="w-36 h-36 object-contain rounded-lg"
+                        />
+                      </div>
+                      <p className="text-xs font-semibold text-foreground">{upiName || "The Box Ux"}</p>
+                      <p className="text-[11px] font-mono text-muted-foreground">{upiId || "aejazrocks618@oksbi"}</p>
+                      <span className="inline-block mt-2 text-[10px] bg-emerald-500/15 text-emerald-600 font-semibold px-2 py-0.5 rounded-full">
+                        Active Receiver on /checkout
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
