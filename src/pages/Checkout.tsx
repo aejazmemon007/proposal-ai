@@ -264,6 +264,26 @@ export default function Checkout() {
           status: "Paid",
         });
         localStorage.setItem(invKey, JSON.stringify(existingInvoices));
+
+        // Global Admin transactions ledger
+        const existingTx = JSON.parse(localStorage.getItem("pai_admin_transactions") || "[]");
+        existingTx.unshift({
+          id: orderId,
+          date: orderDate,
+          userId: user?.id || "guest",
+          userName: fullName,
+          userEmail: email,
+          businessName: businessName || user?.businessName || "",
+          planId: selectedPlan,
+          planName: plan.name,
+          billingCycle,
+          amount: total,
+          paymentMethod: paymentMethod === "upi" ? "UPI" : paymentMethod === "netbanking" ? "Direct Bank Wire" : "Credit/Debit Card",
+          utrNumber: utrNumber || (paymentMethod === "card" ? `CARD-${cardNumber.slice(-4)}` : undefined),
+          status: "verified",
+          verifiedAt: new Date().toISOString(),
+        });
+        localStorage.setItem("pai_admin_transactions", JSON.stringify(existingTx));
       } catch {}
 
       navigate("/thank-you", {

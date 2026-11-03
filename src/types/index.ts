@@ -47,6 +47,31 @@ export function isPlatformAdmin(user: User | null | undefined): boolean {
   );
 }
 
+export interface AdminTransaction {
+  id: string;
+  date: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  businessName?: string;
+  planId: SubscriptionPlan;
+  planName: string;
+  billingCycle: "monthly" | "annual";
+  amount: number;
+  paymentMethod: string;
+  utrNumber?: string;
+  status: "verified" | "pending" | "refunded";
+  verifiedAt?: string;
+}
+
+export interface AdminUserView extends User {
+  status?: "active" | "suspended";
+  joinedAt?: string;
+  lastLogin?: string;
+  proposalsCount?: number;
+  clientsCount?: number;
+}
+
 export interface ScopeItem {
   id: string;
   title: string;

@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Outlet, NavLink, useNavigate, Link } from "react-router-dom";
 import {
   LayoutDashboard, FileText, Users, BarChart2, Settings, Plus, Bell, Sun, Moon,
-  LogOut, Search, Menu, X, ChevronDown, Sparkles, LayoutTemplate,
+  LogOut, Search, Menu, X, ChevronDown, Sparkles, LayoutTemplate, ShieldCheck,
 } from "lucide-react";
 import { useApp } from "../lib/store";
+import { isPlatformAdmin } from "../types";
 
 const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -32,6 +33,7 @@ export default function AppShell() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
+  const isAdmin = isPlatformAdmin(user);
   const unread = notifications.filter((n) => !n.read).length;
 
   const handleLogout = () => {
@@ -65,7 +67,7 @@ export default function AppShell() {
         ))}
       </nav>
 
-      <div className="px-3 py-3 border-t border-border space-y-0.5">
+      <div className="px-3 py-3 border-t border-border space-y-1">
         <NavLink
           to="/settings"
           onClick={() => setMobileOpen(false)}
@@ -80,6 +82,29 @@ export default function AppShell() {
           <Settings className="w-4 h-4 shrink-0" />
           Settings
         </NavLink>
+
+        {isAdmin && (
+          <div className="pt-2">
+            <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-amber-500">Platform Owner</span>
+            <NavLink
+              to="/admin"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold mt-1 transition-all ${
+                  isActive
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm"
+                    : "text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/25"
+                }`
+              }
+            >
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>Admin Console</span>
+              </div>
+              <span className="text-[10px] font-extrabold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">👑</span>
+            </NavLink>
+          </div>
+        )}
       </div>
 
       <div className="px-3 pb-4 pt-2 border-t border-border">
@@ -127,6 +152,17 @@ export default function AppShell() {
           </button>
 
           <div className="flex-1" />
+
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-semibold transition-all shadow-xs"
+              title="Open Platform Admin Console"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden sm:inline">Admin Console</span>
+            </Link>
+          )}
 
           <button
             onClick={() => navigate("/proposals/new")}
@@ -199,6 +235,15 @@ export default function AppShell() {
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
                 <div className="p-1">
+                  {isAdmin && (
+                    <button
+                      onClick={() => { navigate("/admin"); setUserMenuOpen(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors font-semibold"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-amber-500" />
+                      Admin Console
+                    </button>
+                  )}
                   <button
                     onClick={() => { navigate("/settings"); setUserMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-muted transition-colors"

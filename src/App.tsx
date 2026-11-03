@@ -16,11 +16,20 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Templates from "./pages/Templates";
 import PublicProposal from "./pages/PublicProposal";
+import Admin from "./pages/Admin";
+import { isPlatformAdmin } from "./types";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useApp();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!user?.onboardingComplete) return <Navigate to="/onboarding" replace />;
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, user } = useApp();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isPlatformAdmin(user)) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -46,6 +55,9 @@ function AppRoutes() {
 
       {/* Onboarding */}
       <Route path="/onboarding" element={<Onboarding />} />
+
+      {/* Admin Executive Console (Only accessible to platform owner) */}
+      <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
 
       {/* App shell */}
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>

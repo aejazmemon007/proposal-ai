@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import type {
-  User, Proposal, Client, Notification, ProposalStatus, PricingModel, ProposalStyle
+  User, Proposal, Client, Notification, ProposalStatus, PricingModel, ProposalStyle,
+  AdminTransaction, AdminUserView, SubscriptionPlan
 } from "../types";
 
 const FAKE_DOMAINS = [
@@ -86,6 +87,13 @@ interface AppContextType {
   markNotificationRead: (id: string) => void;
   addNotification: (n: Omit<Notification, "id" | "read" | "createdAt">) => void;
   incrementUsage: () => void;
+  // Admin Methods
+  getAllPlatformUsers: () => Promise<AdminUserView[]>;
+  updateUserPlanByAdmin: (userId: string, newPlan: SubscriptionPlan) => Promise<void>;
+  resetUserUsageByAdmin: (userId: string) => Promise<void>;
+  deleteUserByAdmin: (userId: string) => Promise<void>;
+  getAllTransactions: () => AdminTransaction[];
+  verifyTransaction: (txId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -632,6 +640,139 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => prev ? { ...prev, usageThisMonth: prev.usageThisMonth + 1 } : prev);
   }, []);
 
+  // Admin Methods for managing all users & subscription transactions
+  const getAllPlatformUsers = useCallback(async (): Promise<AdminUserView[]> => {
+    let result: AdminUserView[] = [];
+
+    // 1. Supabase Cloud if available
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: profiles } = await supabase.from("profiles").select("*");
+        if (profiles && profiles.length > 0) {
+          result = profiles.map((p) => ({
+            id: p.id,
+            email: p.email,
+            firstName: p.first_name || "User",
+            lastName: p.last_name || "",
+            profession: p.profession,
+            businessName: p.business_name,
+            currency: p.currency || "INR",
+            subscription: (p.subscription as SubscriptionPlan) || "free",
+            usageThisMonth: p.usage_this_month || 0,
+            onboardingComplete: true,
+            status: "active",
+            joinedAt: p.created_at || new Date().toISOString(),
+          }));
+        }
+      } catch (err) {
+        console.warn("Could not fetch cloud profiles:", err);
+      }
+    }
+
+    // 2. Merge local registered accounts
+    const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
+    accounts.forEach((acc) => {
+      const existing = result.find((u) => u.email.toLowerCase() === acc.email.toLowerCase());
+      if (!existing) {
+        result.push({
+          ...acc.user,
+          status: "active",
+          joinedAt: new Date().toISOString(),
+        });
+      } else {
+        existing.subscription = acc.user.subscription;
+        existing.usageThisMonth = acc.user.usageThisMonth;
+      }
+    });
+
+    // 3. Count proposals and clients for each user
+    const allProposals = load<Proposal[]>(STORAGE_KEYS.proposals, []);
+    const allClients = load<Client[]>(STORAGE_KEYS.clients, []);
+    result.forEach((u) => {
+      u.proposalsCount = allProposals.filter((p) => p.userId === u.id).length;
+      u.clientsCount = allClients.filter((c) => c.userId === u.id).length;
+    });
+
+    return result;
+  }, []);
+
+  const updateUserPlanByAdmin = useCallback(async (userId: string, newPlan: SubscriptionPlan) => {
+    // 1. Update in local accounts
+    const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
+    const updatedAccounts = accounts.map((acc) => {
+      if (acc.user.id === userId) {
+        return {
+          ...acc,
+          user: { ...acc.user, subscription: newPlan }
+        };
+      }
+      return acc;
+    });
+    save(STORAGE_KEYS.accounts, updatedAccounts);
+
+    // If current logged-in user is this user, update active user state
+    setUser((prev) => (prev && prev.id === userId ? { ...prev, subscription: newPlan } : prev));
+
+    // 2. Update Supabase if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from("profiles").update({ subscription: newPlan }).eq("id", userId);
+      } catch {}
+    }
+  }, []);
+
+  const resetUserUsageByAdmin = useCallback(async (userId: string) => {
+    const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
+    const updatedAccounts = accounts.map((acc) => {
+      if (acc.user.id === userId) {
+        return {
+          ...acc,
+          user: { ...acc.user, usageThisMonth: 0 }
+        };
+      }
+      return acc;
+    });
+    save(STORAGE_KEYS.accounts, updatedAccounts);
+
+    setUser((prev) => (prev && prev.id === userId ? { ...prev, usageThisMonth: 0 } : prev));
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from("profiles").update({ usage_this_month: 0 }).eq("id", userId);
+      } catch {}
+    }
+  }, []);
+
+  const deleteUserByAdmin = useCallback(async (userId: string) => {
+    const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
+    const remaining = accounts.filter((acc) => acc.user.id !== userId);
+    save(STORAGE_KEYS.accounts, remaining);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from("profiles").delete().eq("id", userId);
+      } catch {}
+    }
+  }, []);
+
+  const getAllTransactions = useCallback((): AdminTransaction[] => {
+    return load<AdminTransaction[]>("pai_admin_transactions", []);
+  }, []);
+
+  const verifyTransaction = useCallback((txId: string) => {
+    const txs = load<AdminTransaction[]>("pai_admin_transactions", []);
+    const target = txs.find((t) => t.id === txId);
+    if (!target) return;
+
+    target.status = "verified";
+    target.verifiedAt = new Date().toISOString();
+    save("pai_admin_transactions", txs);
+
+    if (target.userId && target.userId !== "guest") {
+      updateUserPlanByAdmin(target.userId, target.planId);
+    }
+  }, [updateUserPlanByAdmin]);
+
   // Strict user isolation: users only see their own real proposals and clients
   const userProposals = useMemo(() => {
     if (!user) return [];
@@ -650,6 +791,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createProposal, updateProposal, deleteProposal, duplicateProposal, getProposal, saveProposalDirectly,
       createClient, updateClient, deleteClient, getClient,
       toggleDarkMode, markNotificationRead, addNotification, incrementUsage,
+      getAllPlatformUsers, updateUserPlanByAdmin, resetUserUsageByAdmin, deleteUserByAdmin,
+      getAllTransactions, verifyTransaction,
     }}>
       {children}
     </AppContext.Provider>
