@@ -72,12 +72,30 @@ CREATE TABLE IF NOT EXISTS public.clients (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. Enable Row Level Security (RLS)
+-- 4. Create Transactions Table (Subscription Purchases & UTR Verifications)
+CREATE TABLE IF NOT EXISTS public.transactions (
+  id TEXT PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  user_name TEXT,
+  user_email TEXT NOT NULL,
+  business_name TEXT,
+  plan_id TEXT NOT NULL,
+  plan_name TEXT NOT NULL,
+  billing_cycle TEXT DEFAULT 'monthly',
+  amount NUMERIC NOT NULL,
+  payment_method TEXT,
+  utr_number TEXT,
+  status TEXT DEFAULT 'verified',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 5. Enable Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.proposals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
--- 5. Policies for Profiles
+-- 6. Policies for Profiles
 CREATE POLICY "Users can view their own profile"
   ON public.profiles FOR SELECT
   USING (auth.uid() = id);
@@ -90,7 +108,7 @@ CREATE POLICY "Users can insert their own profile"
   ON public.profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
--- 6. Policies for Proposals
+-- 7. Policies for Proposals
 CREATE POLICY "Users can manage their own proposals"
   ON public.proposals FOR ALL
   USING (auth.uid() = user_id);
@@ -99,10 +117,19 @@ CREATE POLICY "Public can view proposals via public token"
   ON public.proposals FOR SELECT
   USING (public_token IS NOT NULL);
 
--- 7. Policies for Clients
+-- 8. Policies for Clients
 CREATE POLICY "Users can manage their own clients"
   ON public.clients FOR ALL
   USING (auth.uid() = user_id);
+
+-- 9. Policies for Transactions
+CREATE POLICY "Users can view their own transactions"
+  ON public.transactions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert transactions on checkout"
+  ON public.transactions FOR INSERT
+  WITH CHECK (true);
 
 -- Optional: Auto-create profile trigger on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()

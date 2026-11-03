@@ -6,6 +6,7 @@ import {
   Copy, CheckCircle2, QrCode, ExternalLink
 } from "lucide-react";
 import { useApp, isRealEmail } from "../lib/store";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { FREE_PAYMENT_CONFIG, getActivePaymentConfig, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
 import { CURRENCY_SYMBOLS } from "../types";
 import type { SubscriptionPlan } from "../types";
@@ -284,6 +285,24 @@ export default function Checkout() {
           verifiedAt: new Date().toISOString(),
         });
         localStorage.setItem("pai_admin_transactions", JSON.stringify(existingTx));
+
+        // Cloud Database Sync (Supabase) if connected
+        if (isSupabaseConfigured && supabase) {
+          supabase.from("transactions").insert({
+            id: orderId,
+            user_id: user?.id || null,
+            user_name: fullName,
+            user_email: email,
+            business_name: businessName || user?.businessName || null,
+            plan_id: selectedPlan,
+            plan_name: plan.name,
+            billing_cycle: billingCycle,
+            amount: total,
+            payment_method: paymentMethod,
+            utr_number: utrNumber || null,
+            status: "verified",
+          }).then();
+        }
       } catch {}
 
       navigate("/thank-you", {
