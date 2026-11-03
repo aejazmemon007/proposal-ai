@@ -88,6 +88,7 @@ interface AppContextType {
   addNotification: (n: Omit<Notification, "id" | "read" | "createdAt">) => void;
   incrementUsage: () => void;
   // Admin Methods
+  adminLogin: (email: string, pass: string) => Promise<User>;
   getAllPlatformUsers: () => Promise<AdminUserView[]>;
   updateUserPlanByAdmin: (userId: string, newPlan: SubscriptionPlan) => Promise<void>;
   resetUserUsageByAdmin: (userId: string) => Promise<void>;
@@ -170,6 +171,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     if (!password) {
       throw new Error("Please enter your password.");
+    }
+
+    const isAdminOnly = localStorage.getItem("pai_admin_only_mode") === "true";
+    const isAllowedAdmin =
+      cleanEmail === "aejazrocks618@gmail.com" ||
+      cleanEmail === "aejazmemon007@gmail.com" ||
+      cleanEmail.startsWith("aejaz") ||
+      cleanEmail.includes("theboxux") ||
+      cleanEmail.startsWith("admin@");
+
+    if (isAdminOnly && !isAllowedAdmin) {
+      throw new Error("Access Denied: ProposalAI is currently in Admin-Only Mode. Regular user access is temporarily restricted to platform administrators.");
     }
 
     // 1. Cloud Database (Supabase) if configured
@@ -317,6 +330,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanFirst = firstName.trim();
     const cleanLast = lastName.trim();
+
+    const isAdminOnly = localStorage.getItem("pai_admin_only_mode") === "true";
+    const isAllowedAdmin =
+      cleanEmail === "aejazrocks618@gmail.com" ||
+      cleanEmail === "aejazmemon007@gmail.com" ||
+      cleanEmail.startsWith("aejaz") ||
+      cleanEmail.includes("theboxux") ||
+      cleanEmail.startsWith("admin@");
+
+    if (isAdminOnly && !isAllowedAdmin) {
+      throw new Error("Access Denied: ProposalAI is currently in Admin-Only Mode. New user registration is restricted to platform administrators.");
+    }
 
     if (!cleanEmail || !isRealEmail(cleanEmail)) {
       throw new Error("Please enter a valid, authentic email address (e.g. yourname@gmail.com). Test and dummy domains are not permitted.");
@@ -641,6 +666,109 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Admin Methods for managing all users & subscription transactions
+  const adminLogin = useCallback(async (email: string, pass: string): Promise<User> => {
+    await new Promise((r) => setTimeout(r, 600));
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Strict validation: Only platform admin emails are permitted
+    const isAllowedAdmin =
+      cleanEmail === "aejazrocks618@gmail.com" ||
+      cleanEmail === "aejazmemon007@gmail.com" ||
+      cleanEmail.startsWith("aejaz") ||
+      cleanEmail.includes("theboxux") ||
+      cleanEmail.startsWith("admin@");
+
+    if (!isAllowedAdmin) {
+      throw new Error(
+        "Access Denied: This portal is strictly for Platform Administrators. Regular users cannot log in here."
+      );
+    }
+
+    if (!pass || pass.length < 6) {
+      throw new Error("Please enter your administrator password.");
+    }
+
+    // 1. Try cloud authentication if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: pass,
+        });
+        if (!error && data.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", data.user.id)
+            .maybeSingle();
+
+          const adminUser: User = {
+            id: data.user.id,
+            email: cleanEmail,
+            firstName: profile?.first_name || "Aejaz",
+            lastName: profile?.last_name || "Memon",
+            role: "admin",
+            currency: profile?.currency || "INR",
+            subscription: "studio",
+            usageThisMonth: profile?.usage_this_month || 0,
+            onboardingComplete: true,
+            businessName: profile?.business_name || "The Box Ux",
+            upiId: profile?.upi_id || "aejazrocks618@oksbi",
+            upiName: profile?.upi_name || "Aejaz Memon",
+            bankName: profile?.bank_name || "State Bank of India",
+            ifscCode: profile?.ifsc_code || "HDFC0000123",
+          };
+          setUser(adminUser);
+          save(STORAGE_KEYS.user, adminUser);
+          return adminUser;
+        }
+      } catch {}
+    }
+
+    // 2. Local authentication fallback
+    const accounts = load<RegisteredAccount[]>(STORAGE_KEYS.accounts, []);
+    let account = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+
+    if (!account) {
+      // First time admin login: auto-provision authorized super admin account
+      const adminUser: User = {
+        id: "admin_" + cleanEmail.replace(/[^a-z0-9]/g, ""),
+        email: cleanEmail,
+        firstName: cleanEmail.includes("aejaz") ? "Aejaz" : "Super",
+        lastName: cleanEmail.includes("aejaz") ? "Memon" : "Admin",
+        role: "admin",
+        currency: "INR",
+        subscription: "studio",
+        usageThisMonth: 0,
+        onboardingComplete: true,
+        businessName: "The Box Ux",
+        upiId: "aejazrocks618@oksbi",
+        upiName: "Aejaz Memon",
+        bankName: "State Bank of India",
+        ifscCode: "HDFC0000123",
+      };
+
+      const newAccounts = [...accounts, { email: cleanEmail, password: pass, user: adminUser }];
+      save(STORAGE_KEYS.accounts, newAccounts);
+      setUser(adminUser);
+      save(STORAGE_KEYS.user, adminUser);
+      return adminUser;
+    }
+
+    if (account.password !== pass) {
+      throw new Error("Incorrect administrator password. Please check credentials and try again.");
+    }
+
+    const updatedAdminUser: User = {
+      ...account.user,
+      role: "admin",
+      onboardingComplete: true,
+    };
+    setUser(updatedAdminUser);
+    save(STORAGE_KEYS.user, updatedAdminUser);
+    return updatedAdminUser;
+  }, []);
+
   const getAllPlatformUsers = useCallback(async (): Promise<AdminUserView[]> => {
     let result: AdminUserView[] = [];
 
@@ -791,7 +919,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       createProposal, updateProposal, deleteProposal, duplicateProposal, getProposal, saveProposalDirectly,
       createClient, updateClient, deleteClient, getClient,
       toggleDarkMode, markNotificationRead, addNotification, incrementUsage,
-      getAllPlatformUsers, updateUserPlanByAdmin, resetUserUsageByAdmin, deleteUserByAdmin,
+      adminLogin, getAllPlatformUsers, updateUserPlanByAdmin, resetUserUsageByAdmin, deleteUserByAdmin,
       getAllTransactions, verifyTransaction,
     }}>
       {children}

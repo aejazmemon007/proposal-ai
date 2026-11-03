@@ -51,6 +51,23 @@ export default function Admin() {
   const [ifscCode, setIfscCode] = useState(activeAdminConfig.ifscCode);
   const [payoutSaved, setPayoutSaved] = useState(false);
 
+  // Platform Access Mode (Public vs Admin-Only)
+  const [adminOnlyMode, setAdminOnlyMode] = useState<boolean>(() => {
+    return localStorage.getItem("pai_admin_only_mode") === "true";
+  });
+
+  const toggleAdminOnlyMode = () => {
+    const next = !adminOnlyMode;
+    setAdminOnlyMode(next);
+    localStorage.setItem("pai_admin_only_mode", String(next));
+    setActionSuccess(
+      next
+        ? "Platform locked to Admin-Only Mode. Normal users cannot sign in or register."
+        : "Public access restored. Normal users can sign in and create proposals."
+    );
+    setTimeout(() => setActionSuccess(null), 3500);
+  };
+
   // Fetch all user and transaction data
   const loadData = async () => {
     setLoading(true);
@@ -768,59 +785,98 @@ export default function Admin() {
 
         {/* TAB 4: DATABASE & SYSTEM HEALTH */}
         {activeTab === "system" && (
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-sm font-semibold text-white">System Architecture & Database Health</h3>
-              </div>
-              <div className="space-y-3 text-xs text-slate-300">
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <span>Cloud Database (Supabase)</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
-                    Dual-Sync Active
-                  </span>
+          <div className="space-y-6">
+            {/* Admin-Only Platform Lock Control */}
+            <div className={`p-6 rounded-2xl border transition-all ${
+              adminOnlyMode
+                ? "bg-amber-950/20 border-amber-500/40"
+                : "bg-slate-900 border-slate-800"
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-sm font-bold text-white">Platform Access Lock (Admin-Only Mode)</h3>
+                    <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                      adminOnlyMode
+                        ? "bg-amber-500 text-slate-950 font-black animate-pulse"
+                        : "bg-slate-800 text-slate-300 border border-slate-700"
+                    }`}>
+                      {adminOnlyMode ? "LOCKED TO ADMIN ONLY" : "PUBLIC ACCESS ACTIVE"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 max-w-xl leading-relaxed">
+                    When enabled, <strong>no normal user can sign up or log in</strong>. Any attempt by regular users to log in or register is blocked with an admin maintenance message. Only verified platform administrators can log in.
+                  </p>
                 </div>
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <span>Local Account Storage (Browser Cache)</span>
-                  <span className="font-mono text-slate-400">{usersList.length} Accounts Synchronized</span>
-                </div>
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <span>Zero Dummy Data Filter</span>
-                  <span className="text-emerald-400 font-semibold">Strict Domain Enforced</span>
-                </div>
+
+                <button
+                  onClick={toggleAdminOnlyMode}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg ${
+                    adminOnlyMode
+                      ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30"
+                      : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/30"
+                  }`}
+                >
+                  {adminOnlyMode ? "Unlock to Public Access" : "Lock to Admin-Only Mode"}
+                </button>
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
-              <div className="flex items-center gap-2">
-                <Download className="w-5 h-5 text-violet-400" />
-                <h3 className="text-sm font-semibold text-white">Export Platform Data Backup</h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-sm font-semibold text-white">System Architecture & Database Health</h3>
+                </div>
+                <div className="space-y-3 text-xs text-slate-300">
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span>Cloud Database (Supabase)</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+                      Dual-Sync Active
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span>Local Account Storage (Browser Cache)</span>
+                    <span className="font-mono text-slate-400">{usersList.length} Accounts Synchronized</span>
+                  </div>
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span>Zero Dummy Data Filter</span>
+                    <span className="text-emerald-400 font-semibold">Strict Domain Enforced</span>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Download a complete, encrypted JSON snapshot of all registered users, proposal metadata, and verified transaction receipts.
-              </p>
-              <button
-                onClick={() => {
-                  const backup = {
-                    exportedAt: new Date().toISOString(),
-                    totalUsers: usersList.length,
-                    users: usersList,
-                    transactions: transactionsList,
-                  };
-                  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `proposal-ai-admin-backup-${Date.now()}.json`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                <span>Download Platform Backup (JSON)</span>
-              </button>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+                <div className="flex items-center gap-2">
+                  <Download className="w-5 h-5 text-violet-400" />
+                  <h3 className="text-sm font-semibold text-white">Export Platform Data Backup</h3>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Download a complete, encrypted JSON snapshot of all registered users, proposal metadata, and verified transaction receipts.
+                </p>
+                <button
+                  onClick={() => {
+                    const backup = {
+                      exportedAt: new Date().toISOString(),
+                      totalUsers: usersList.length,
+                      users: usersList,
+                      transactions: transactionsList,
+                    };
+                    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `proposal-ai-admin-backup-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Platform Backup (JSON)</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
