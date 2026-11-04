@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { isPlatformAdmin } from "../types";
-import { LogoSymbol } from "./Logo";
 
 const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -19,8 +18,8 @@ const NAV_ITEMS = [
 function Logo() {
   return (
     <Link to="/dashboard" className="flex items-center gap-2.5 group">
-      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-sm">
-        <LogoSymbol className="w-4.5 h-4.5" />
+      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+        <Sparkles className="w-4 h-4 text-white" />
       </div>
       <span className="font-semibold text-foreground tracking-tight text-[15px]">ProposalAI</span>
     </Link>

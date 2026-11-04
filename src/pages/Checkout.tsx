@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { useApp, isRealEmail } from "../lib/store";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { LogoSymbol } from "../components/Logo";
 import { FREE_PAYMENT_CONFIG, getActivePaymentConfig, buildUpiIntentUrl, buildUpiQrCodeUrl } from "../config/payments";
 import { CURRENCY_SYMBOLS } from "../types";
 import type { SubscriptionPlan } from "../types";
@@ -361,7 +360,7 @@ export default function Checkout() {
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/20">
-                <LogoSymbol className="w-4.5 h-4.5" />
+                <Sparkles className="w-4 h-4 text-primary-foreground" />
               </div>
               <span className="font-bold text-foreground text-[16px]">ProposalAI</span>
             </Link>

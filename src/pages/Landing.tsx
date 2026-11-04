@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { LogoSymbol } from "../components/Logo";
 import {
   ArrowRight, Sparkles, Check, ChevronDown, Menu, X, FileText, Zap, Clock,
   TrendingUp, Shield, Globe, Star, Palette, Sliders, Layers, Eye, Award,
@@ -126,7 +125,7 @@ function Navbar() {
         {/* Brand */}
         <Link to="/" className="flex items-center gap-2.5 group">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-violet-500/25 group-hover:scale-105 transition-transform">
-            <LogoSymbol className="w-4.5 h-4.5" />
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-900 text-base tracking-tight">ProposalAI</span>
@@ -1156,7 +1155,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow-md">
-              <LogoSymbol className="w-4.5 h-4.5" />
+              <Sparkles className="w-4 h-4" />
             </div>
             <div>
               <span className="font-bold text-slate-900 text-sm">ProposalAI</span>

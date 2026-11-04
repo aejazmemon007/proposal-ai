@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { useApp } from "../lib/store";
 import { PROFESSIONS, CURRENCIES } from "../types";
-import { LogoSymbol } from "../components/Logo";
 
 const STEPS = ["Profile", "Profession", "Pricing", "Business", "Finish"];
 
@@ -43,8 +42,8 @@ export default function Onboarding() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="px-6 py-5 border-b border-border flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-xs">
-          <LogoSymbol className="w-4.5 h-4.5" />
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-white" />
         </div>
         <span className="font-semibold text-foreground">ProposalAI</span>
         <span className="text-muted-foreground text-sm">— Setting up your account</span>
