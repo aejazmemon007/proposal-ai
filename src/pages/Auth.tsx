@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Sparkles, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { LogoSymbol } from "../components/Logo";
 import { useApp } from "../lib/store";
 
 interface AuthProps {
@@ -96,8 +97,8 @@ export default function Auth({ mode }: AuthProps) {
       {/* Left panel */}
       <div className="hidden lg:flex flex-col w-[44%] bg-[#0f0f12] p-10 relative overflow-hidden">
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+            <LogoSymbol className="w-4.5 h-4.5" />
           </div>
           <span className="font-semibold text-white text-[15px]">ProposalAI</span>
         </Link>
@@ -135,8 +136,8 @@ export default function Auth({ mode }: AuthProps) {
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex justify-center mb-8">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+                <LogoSymbol className="w-4.5 h-4.5" />
               </div>
               <span className="font-semibold text-foreground text-[15px]">ProposalAI</span>
             </Link>

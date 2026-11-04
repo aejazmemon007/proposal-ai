@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Sparkles, ArrowLeft } from "lucide-react";
+import { LogoSymbol } from "../components/Logo";
 
 const PLANS = [
   {
@@ -72,8 +73,8 @@ export default function Pricing() {
       {/* Header */}
       <div className="px-6 py-5 border-b border-[#e5e5eb] flex items-center gap-3">
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#7c3aed] flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-[#7c3aed] flex items-center justify-center shadow-sm">
+            <LogoSymbol className="w-4.5 h-4.5" />
           </div>
           <span className="font-semibold text-[#0f0f12] text-[15px]">ProposalAI</span>
         </Link>

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { downloadElementAsPDF } from "../lib/pdfExport";
+import { LogoSymbol } from "../components/Logo";
 
 interface OrderState {
   orderId?: string;
@@ -80,7 +81,7 @@ export default function ThankYou() {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/20">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
+              <LogoSymbol className="w-4.5 h-4.5" />
             </div>
             <span className="font-bold text-foreground text-[16px]">ProposalAI</span>
           </Link>

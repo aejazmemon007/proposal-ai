@@ -6,6 +6,7 @@ import { CURRENCY_SYMBOLS } from "../types";
 import type { ProposalContent, TemplateDesignId } from "../types";
 import ProposalThemeView from "../components/ProposalThemeView";
 import { downloadElementAsPDF } from "../lib/pdfExport";
+import { LogoSymbol } from "../components/Logo";
 
 const REJECTION_REASONS = [
   "Budget constraints or pricing adjustment needed",
@@ -182,7 +183,7 @@ export default function PublicProposal() {
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-600/20">
-              <Sparkles className="w-4 h-4 text-white" />
+              <LogoSymbol className="w-4.5 h-4.5" />
             </div>
             <div>
               <span className="text-xs font-bold text-slate-900 block leading-tight">{proposal.projectName}</span>
